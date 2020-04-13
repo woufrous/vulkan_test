@@ -98,6 +98,8 @@ class VulkanRenderer {
             if (res != VK_SUCCESS) {
                 throw VulkanError("Device creation failed.", res);
             }
+
+            vkGetDeviceQueue(dev_.logical, q_idx, 0, &queues_.graphics);
         }
 
         GLFWwindow* win_;
@@ -106,4 +108,7 @@ class VulkanRenderer {
             VkPhysicalDevice physical;
             VkDevice logical;
         } dev_;
+        struct {
+            VkQueue graphics;
+        } queues_;
 };
