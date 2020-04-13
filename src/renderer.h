@@ -50,7 +50,9 @@ class VulkanRenderer {
 
             inst_info.pApplicationInfo = &app_info;
             // set required extension
-            inst_info.ppEnabledExtensionNames = glfwGetRequiredInstanceExtensions(&(inst_info.enabledExtensionCount));
+            auto exts = required_extensions();
+            inst_info.enabledExtensionCount = static_cast<uint32_t>(exts.size());
+            inst_info.ppEnabledExtensionNames = exts.data();
 
             auto res = vkCreateInstance(&inst_info, nullptr, &inst_);
             if (res != VK_SUCCESS) {
@@ -100,6 +102,20 @@ class VulkanRenderer {
             }
 
             vkGetDeviceQueue(dev_.logical, q_idx, 0, &queues_.graphics);
+        }
+
+        std::vector<const char*> required_extensions() const noexcept {
+            auto ret = std::vector<const char*> {
+                VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+            };
+
+            uint32_t ext_cnt = 0;
+            auto glfw_exts = glfwGetRequiredInstanceExtensions(&ext_cnt);
+            for (; ext_cnt>0; --ext_cnt) {
+                ret.push_back(glfw_exts[ext_cnt-1]);
+            }
+
+            return ret;
         }
 
         GLFWwindow* win_;
