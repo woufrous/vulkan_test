@@ -2,6 +2,7 @@
 
 #include <exception>
 #include <memory>
+#include <vector>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -21,7 +22,7 @@ class VulkanError : public std::runtime_error {
 class VulkanRenderer {
     public:
         VulkanRenderer(GLFWwindow* win) noexcept :
-        win_(win), inst_() {}
+        win_(win), inst_(), dev_() {}
 
         ~VulkanRenderer() {
             vkDestroyInstance(inst_, nullptr);
@@ -29,6 +30,7 @@ class VulkanRenderer {
 
         void init() {
             create_instance();
+            create_device();
         }
 
     private:
@@ -54,6 +56,20 @@ class VulkanRenderer {
             }
         }
 
+        void create_device() {
+            uint32_t dev_cnt = 0;
+            vkEnumeratePhysicalDevices(inst_, &dev_cnt, nullptr);
+
+            auto devs = std::vector<VkPhysicalDevice>(5);
+            vkEnumeratePhysicalDevices(inst_, &dev_cnt, devs.data());
+
+            dev_.physical = devs[0];
+        }
+
         GLFWwindow* win_;
         VkInstance inst_;
+        struct {
+            VkPhysicalDevice physical;
+            VkDevice logical;
+        } dev_;
 };
