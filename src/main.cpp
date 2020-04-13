@@ -18,6 +18,18 @@ int main(int argc, char* argv[]) {
     if (glfwInit() != GLFW_TRUE) {
         return 1;
     }
+    if (glfwVulkanSupported()) {
+        std::cout << "Vulkan supported" << std::endl;
+        uint32_t ext_cnt = 0;
+        auto exts = glfwGetRequiredInstanceExtensions(&ext_cnt);
+        std::cout << ext_cnt << " extensions required:\n";
+        for (uint32_t i=0; i<ext_cnt; ++i) {
+            std::cout << "\t" << exts[i] << "\n";
+        }
+    } else {
+        std::cerr << "Vulkan is NOT supported!" << std::endl;
+        return 1;
+    }
 
     // create window
     glfwInitHint(GLFW_RESIZABLE, GLFW_FALSE);
@@ -28,6 +40,24 @@ int main(int argc, char* argv[]) {
             glfwDestroyWindow(win);
         }
     );
+
+    auto renderer = VulkanRenderer(win.get());
+    try {
+        renderer.init();
+    }
+    catch (const VulkanError& ex) {
+        std::cerr << ex.what() << std::endl;
+        std::cerr << "Errorcode: " << ex.get_error() << std::endl;
+
+        glfwTerminate();
+        return 1;
+    }
+    catch (...) {
+        std::cerr << "Unhandled exception!" << std::endl;
+
+        glfwTerminate();
+        return 1;
+    }
 
     // main loop
     while (!glfwWindowShouldClose(win.get())) {

@@ -12,6 +12,10 @@ target_link_libraries(vulkan_course
         glfw
         Vulkan::Vulkan
 )
+target_compile_features(vulkan_course
+    PUBLIC
+        cxx_std_17
+)
 
 include(CTest)
 enable_testing()
