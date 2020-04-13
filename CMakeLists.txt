@@ -4,7 +4,9 @@ project(vulkan_course VERSION 0.1.0)
 find_package(glfw3 3.3 REQUIRED)
 find_package(Vulkan REQUIRED)
 
-add_executable(vulkan_course main.cpp)
+add_executable(vulkan_course
+    src/main.cpp
+)
 target_link_libraries(vulkan_course
     PUBLIC
         glfw
