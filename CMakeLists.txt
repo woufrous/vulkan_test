@@ -2,13 +2,13 @@ cmake_minimum_required(VERSION 3.0.0)
 project(vulkan_course VERSION 0.1.0)
 
 find_package(glfw3 3.3 REQUIRED)
-find_package(OpenGL REQUIRED)
+find_package(Vulkan REQUIRED)
 
 add_executable(vulkan_course main.cpp)
 target_link_libraries(vulkan_course
     PUBLIC
-        OpenGL::GL
         glfw
+        Vulkan::Vulkan
 )
 
 include(CTest)
