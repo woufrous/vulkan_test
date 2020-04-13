@@ -25,12 +25,14 @@ class VulkanRenderer {
         win_(win), inst_(), dev_() {}
 
         ~VulkanRenderer() {
+            vkDestroyDevice(dev_.logical, nullptr);
             vkDestroyInstance(inst_, nullptr);
         }
 
         void init() {
             create_instance();
             create_device();
+            create_logical_device();
         }
 
     private:
@@ -64,6 +66,38 @@ class VulkanRenderer {
             vkEnumeratePhysicalDevices(inst_, &dev_cnt, devs.data());
 
             dev_.physical = devs[0];
+        }
+
+        void create_logical_device() {
+            uint32_t qfam_cnt;
+            vkGetPhysicalDeviceQueueFamilyProperties(dev_.physical, &qfam_cnt, nullptr);
+            std::vector<VkQueueFamilyProperties> qfams(qfam_cnt);
+            vkGetPhysicalDeviceQueueFamilyProperties(dev_.physical, &qfam_cnt, qfams.data());
+
+            uint32_t q_idx = 0;
+            for (auto& qfam : qfams) {
+                if ((qfam.queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0 &&
+                    (qfam.queueCount > 0)) {
+                    break;
+                }
+            }
+
+            VkDeviceQueueCreateInfo queue_info{};
+            queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            queue_info.queueCount = 1;
+            queue_info.queueFamilyIndex = q_idx;
+            auto q_prio = 1.0f;
+            queue_info.pQueuePriorities = &q_prio;
+
+            VkDeviceCreateInfo ldev_info{};
+            ldev_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+            ldev_info.queueCreateInfoCount = 1;
+            ldev_info.pQueueCreateInfos = &queue_info;
+
+            auto res = vkCreateDevice(dev_.physical, &ldev_info, nullptr, &dev_.logical);
+            if (res != VK_SUCCESS) {
+                throw VulkanError("Device creation failed.", res);
+            }
         }
 
         GLFWwindow* win_;
