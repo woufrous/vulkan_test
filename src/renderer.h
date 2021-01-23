@@ -7,6 +7,8 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "validation.h"
+
 class VulkanError : public std::runtime_error {
     public:
         VulkanError(const char* what, VkResult ec) :
@@ -22,15 +24,26 @@ class VulkanError : public std::runtime_error {
 class VulkanRenderer {
     public:
         VulkanRenderer(GLFWwindow* win) noexcept :
-        win_(win), inst_(), dev_() {}
+        win_(win), inst_(), dbg_msngr_(nullptr), dev_() {}
 
         ~VulkanRenderer() {
             vkDestroyDevice(dev_.logical, nullptr);
+#ifndef DEBUG
+            if (dbg_msngr_ != nullptr) {
+                auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+                    vkGetInstanceProcAddr(inst_, "vkDestroyDebugUtilsMessengerEXT")
+                );
+                func(inst_, dbg_msngr_, nullptr);
+            }
+#endif
             vkDestroyInstance(inst_, nullptr);
         }
 
         void init() {
             create_instance();
+#ifndef NDEBUG
+            setup_dbg_msngr();
+#endif
             create_device();
             create_logical_device();
         }
@@ -53,6 +66,12 @@ class VulkanRenderer {
             auto exts = required_extensions();
             inst_info.enabledExtensionCount = static_cast<uint32_t>(exts.size());
             inst_info.ppEnabledExtensionNames = exts.data();
+#ifndef NDEBUG
+            // set validation layers
+            auto layers = this->required_layers();
+            inst_info.enabledLayerCount = static_cast<uint32_t>(layers.size());
+            inst_info.ppEnabledLayerNames = layers.data();
+#endif
 
             auto res = vkCreateInstance(&inst_info, nullptr, &inst_);
             if (res != VK_SUCCESS) {
@@ -104,9 +123,45 @@ class VulkanRenderer {
             vkGetDeviceQueue(dev_.logical, q_idx, 0, &queues_.graphics);
         }
 
+#ifndef NDEBUG
+        void setup_dbg_msngr() {
+            VkDebugUtilsMessengerCreateInfoEXT info{};
+            info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+            info.messageSeverity = (
+                VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+            );
+            info.messageType = (
+                VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT
+            );
+            info.pfnUserCallback = debug_callback;
+            info.pUserData = nullptr;
+
+            auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+                vkGetInstanceProcAddr(inst_, "vkCreateDebugUtilsMessengerEXT")
+            );
+            if (func == nullptr) {
+                throw VulkanError("Error finding proc address", VK_ERROR_EXTENSION_NOT_PRESENT);
+            }
+            if (auto res = func(inst_, &info, nullptr, &dbg_msngr_); res != VK_SUCCESS) {
+                throw VulkanError("Error creating debug messenger", res);
+            }
+        }
+
+        std::vector<const char*> required_layers() const noexcept {
+            auto ret = std::vector<const char*> {
+                "VK_LAYER_KHRONOS_validation",
+            };
+            return ret;
+        }
+#endif
+
         std::vector<const char*> required_extensions() const noexcept {
             auto ret = std::vector<const char*> {
-                VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+                VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
             };
 
             uint32_t ext_cnt = 0;
@@ -120,6 +175,9 @@ class VulkanRenderer {
 
         GLFWwindow* win_;
         VkInstance inst_;
+#ifndef NDEBUG
+        VkDebugUtilsMessengerEXT dbg_msngr_;
+#endif
         struct {
             VkPhysicalDevice physical;
             VkDevice logical;
