@@ -32,8 +32,8 @@ int main(int argc, char* argv[]) {
     }
 
     // create window
-    glfwInitHint(GLFW_RESIZABLE, GLFW_FALSE);
-    glfwInitHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     auto win = std::shared_ptr<GLFWwindow>(
         glfwCreateWindow(800, 600, "Vulkan Test", nullptr, nullptr),
         [](auto win) {
