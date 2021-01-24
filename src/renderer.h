@@ -24,7 +24,7 @@ class VulkanError : public std::runtime_error {
 class VulkanRenderer {
     public:
         VulkanRenderer(GLFWwindow* win) noexcept :
-        win_(win), inst_(), dbg_msngr_(nullptr), dev_() {}
+        win_(win), inst_(), dbg_msngr_(), surf_(), dev_() {}
 
         ~VulkanRenderer() {
             vkDestroyDevice(dev_.logical, nullptr);
@@ -36,6 +36,9 @@ class VulkanRenderer {
                 func(inst_, dbg_msngr_, nullptr);
             }
 #endif
+            if (surf_ != nullptr) {
+                vkDestroySurfaceKHR(inst_, surf_, nullptr);
+            }
             vkDestroyInstance(inst_, nullptr);
         }
 
@@ -44,6 +47,7 @@ class VulkanRenderer {
 #ifndef NDEBUG
             setup_dbg_msngr();
 #endif
+            create_surface();
             create_device();
             create_logical_device();
         }
@@ -87,6 +91,13 @@ class VulkanRenderer {
             auto res = vkCreateInstance(&inst_info, nullptr, &inst_);
             if (res != VK_SUCCESS) {
                 throw VulkanError("Instance creation failed", res);
+            }
+        }
+
+        void create_surface() {
+            auto res = glfwCreateWindowSurface(inst_, win_, nullptr, &surf_);
+            if (res != VK_SUCCESS) {
+                throw VulkanError("Surface creation failed", res);
             }
         }
 
@@ -186,6 +197,7 @@ class VulkanRenderer {
 #ifndef NDEBUG
         VkDebugUtilsMessengerEXT dbg_msngr_;
 #endif
+        VkSurfaceKHR surf_;
         struct {
             VkPhysicalDevice physical;
             VkDevice logical;
