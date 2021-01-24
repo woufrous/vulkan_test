@@ -8,9 +8,23 @@ inline VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT           messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT                  messageTypes,
     const VkDebugUtilsMessengerCallbackDataEXT*      pCallbackData,
-    void*                                            pUserData) {
+    void*                                            pUserData
+) {
+    (void)messageTypes;
+    (void)pUserData;
 
-    std::cerr << "Validation msg: " << pCallbackData->pMessage << std::endl;
+    switch (messageSeverity) {
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
+            std::cerr << "[E] ";
+        } break;
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
+            std::cerr << "[W] ";
+        } break;
+        default: {
+            std::cerr << "[D] ";
+        } break;
+    }
+    std::cerr << pCallbackData->pMessage << std::endl;
     return VK_FALSE;
 }
 
