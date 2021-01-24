@@ -2,12 +2,15 @@
 
 #include <exception>
 #include <memory>
+#include <optional>
+#include <set>
 #include <vector>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 #include "validation.h"
+#include "utils.h"
 
 class VulkanError : public std::runtime_error {
     public:
@@ -111,7 +114,20 @@ class VulkanRenderer {
             auto devs = std::vector<VkPhysicalDevice>(dev_cnt);
             vkEnumeratePhysicalDevices(inst_, &dev_cnt, devs.data());
 
-            dev_.physical = devs[0];
+            for (auto dev : devs) {
+                // has present queue
+                uint32_t queue_cnt;
+                vkGetPhysicalDeviceQueueFamilyProperties(dev, &queue_cnt, nullptr);
+
+                VkBool32 supported;
+                for (uint32_t idx=0; idx<queue_cnt; ++idx) {
+                    vkGetPhysicalDeviceSurfaceSupportKHR(dev, idx, surf_, &supported);
+                    if (supported) {
+                        dev_.physical = dev;
+                        return;
+                    }
+                }
+            }
         }
 
         void create_logical_device() {
@@ -120,32 +136,57 @@ class VulkanRenderer {
             std::vector<VkQueueFamilyProperties> qfams(qfam_cnt);
             vkGetPhysicalDeviceQueueFamilyProperties(dev_.physical, &qfam_cnt, qfams.data());
 
-            uint32_t q_idx = 0;
-            for (auto& qfam : qfams) {
-                if ((qfam.queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0 &&
-                    (qfam.queueCount > 0)) {
+            // find graphics queue
+            auto gfx_queue_idx = filter_queues(qfams, [](const VkQueueFamilyProperties& qfam) -> bool {
+                return (
+                    (qfam.queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0 &&
+                    (qfam.queueCount > 0)
+                );
+            });
+            if (!gfx_queue_idx) {
+                throw std::runtime_error("No graphics queue found");
+            }
+
+            // find present queue
+            auto present_queue_idx = std::optional<uint32_t>{std::nullopt};
+            VkBool32 supported;
+            for (uint32_t idx=0; idx<qfam_cnt; ++idx) {
+                vkGetPhysicalDeviceSurfaceSupportKHR(dev_.physical, idx, surf_, &supported);
+                if (supported) {
+                    present_queue_idx = idx;
                     break;
                 }
             }
+            if (!present_queue_idx) {
+                throw std::runtime_error("No present queue found");
+            }
 
-            VkDeviceQueueCreateInfo queue_info{};
-            queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-            queue_info.queueCount = 1;
-            queue_info.queueFamilyIndex = q_idx;
+            auto idxs = std::set<uint32_t>{*present_queue_idx, *gfx_queue_idx};
+
+            auto queue_create_infos = std::vector<VkDeviceQueueCreateInfo>{};
             auto q_prio = 1.0f;
-            queue_info.pQueuePriorities = &q_prio;
+            for (auto idx : idxs) {
+                VkDeviceQueueCreateInfo queue_info{};
+                queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+                queue_info.queueCount = 1;
+                queue_info.queueFamilyIndex = idx;
+                queue_info.pQueuePriorities = &q_prio;
+
+                queue_create_infos.push_back(queue_info);
+            };
 
             VkDeviceCreateInfo ldev_info{};
             ldev_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-            ldev_info.queueCreateInfoCount = 1;
-            ldev_info.pQueueCreateInfos = &queue_info;
+            ldev_info.queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size());
+            ldev_info.pQueueCreateInfos = queue_create_infos.data();
 
             auto res = vkCreateDevice(dev_.physical, &ldev_info, nullptr, &dev_.logical);
             if (res != VK_SUCCESS) {
                 throw VulkanError("Device creation failed.", res);
             }
 
-            vkGetDeviceQueue(dev_.logical, q_idx, 0, &queues_.graphics);
+            vkGetDeviceQueue(dev_.logical, *gfx_queue_idx, 0, &queues_.graphics);
+            vkGetDeviceQueue(dev_.logical, *present_queue_idx, 0, &queues_.present);
         }
 
 #ifndef NDEBUG
@@ -204,5 +245,6 @@ class VulkanRenderer {
         } dev_;
         struct {
             VkQueue graphics;
+            VkQueue present;
         } queues_;
 };
