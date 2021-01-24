@@ -71,6 +71,18 @@ class VulkanRenderer {
             auto layers = this->required_layers();
             inst_info.enabledLayerCount = static_cast<uint32_t>(layers.size());
             inst_info.ppEnabledLayerNames = layers.data();
+
+            auto inst_msngr = newDebugUtilsMessengerCreateInfoEXT(
+                inst_, debug_callback, (
+                    VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                    VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
+                ), (
+                    VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                    VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
+                    VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
+                )
+            );
+            inst_info.pNext = &inst_msngr;
 #endif
 
             auto res = vkCreateInstance(&inst_info, nullptr, &inst_);
@@ -125,21 +137,15 @@ class VulkanRenderer {
 
 #ifndef NDEBUG
         void setup_dbg_msngr() {
-            VkDebugUtilsMessengerCreateInfoEXT info{};
-            info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-            info.messageSeverity = (
-                VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
-                VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+            auto info = newDebugUtilsMessengerCreateInfoEXT(inst_, debug_callback, (
+                    VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                    VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
+                ), (
+                    VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                    VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
+                    VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
+                )
             );
-            info.messageType = (
-                VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT
-            );
-            info.pfnUserCallback = debug_callback;
-            info.pUserData = nullptr;
-
             auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
                 vkGetInstanceProcAddr(inst_, "vkCreateDebugUtilsMessengerEXT")
             );

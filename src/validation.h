@@ -13,3 +13,21 @@ inline VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     std::cerr << "Validation msg: " << pCallbackData->pMessage << std::endl;
     return VK_FALSE;
 }
+
+inline VkDebugUtilsMessengerCreateInfoEXT
+newDebugUtilsMessengerCreateInfoEXT(
+    VkInstance inst,
+    PFN_vkDebugUtilsMessengerCallbackEXT callback,
+    VkDebugUtilsMessageSeverityFlagsEXT severity,
+    VkDebugUtilsMessageTypeFlagsEXT type
+) {
+
+    auto info = VkDebugUtilsMessengerCreateInfoEXT{};
+    info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    info.messageSeverity = severity;
+    info.messageType = type;
+    info.pfnUserCallback = callback;
+    info.pUserData = nullptr;
+
+    return info;
+}
