@@ -93,8 +93,11 @@ class VulkanRenderer {
         void create_device() {
             uint32_t dev_cnt = 0;
             vkEnumeratePhysicalDevices(inst_, &dev_cnt, nullptr);
+            if (dev_cnt == 0) {
+                throw std::runtime_error("No physical device found");
+            }
 
-            auto devs = std::vector<VkPhysicalDevice>(5);
+            auto devs = std::vector<VkPhysicalDevice>(dev_cnt);
             vkEnumeratePhysicalDevices(inst_, &dev_cnt, devs.data());
 
             dev_.physical = devs[0];
