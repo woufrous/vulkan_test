@@ -16,6 +16,10 @@ target_compile_features(vulkan_course
     PUBLIC
         cxx_std_17
 )
+target_compile_options(vulkan_course
+    PUBLIC
+        -Wall -Wextra -Wpedantic
+)
 
 include(CTest)
 enable_testing()

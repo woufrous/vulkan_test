@@ -16,7 +16,6 @@ inline VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 
 inline VkDebugUtilsMessengerCreateInfoEXT
 newDebugUtilsMessengerCreateInfoEXT(
-    VkInstance inst,
     PFN_vkDebugUtilsMessengerCallbackEXT callback,
     VkDebugUtilsMessageSeverityFlagsEXT severity,
     VkDebugUtilsMessageTypeFlagsEXT type

@@ -72,8 +72,7 @@ class VulkanRenderer {
             inst_info.enabledLayerCount = static_cast<uint32_t>(layers.size());
             inst_info.ppEnabledLayerNames = layers.data();
 
-            auto inst_msngr = newDebugUtilsMessengerCreateInfoEXT(
-                inst_, debug_callback, (
+            auto inst_msngr = newDebugUtilsMessengerCreateInfoEXT(debug_callback, (
                     VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
                     VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
                 ), (
@@ -137,7 +136,7 @@ class VulkanRenderer {
 
 #ifndef NDEBUG
         void setup_dbg_msngr() {
-            auto info = newDebugUtilsMessengerCreateInfoEXT(inst_, debug_callback, (
+            auto info = newDebugUtilsMessengerCreateInfoEXT(debug_callback, (
                     VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
                     VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
                 ), (
