@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.0.0)
 project(vulkan_course VERSION 0.1.0)
 
+include(CTest)
+enable_testing()
+
 find_package(glfw3 3.3 REQUIRED)
 find_package(Vulkan REQUIRED)
 
@@ -14,15 +17,16 @@ target_link_libraries(vulkan_course
 )
 target_compile_features(vulkan_course
     PUBLIC
-        cxx_std_17
+        cxx_std_20
 )
 target_compile_options(vulkan_course
     PUBLIC
         -Wall -Wextra -Wpedantic
 )
-
-include(CTest)
-enable_testing()
+set_target_properties(vulkan_course
+    PROPERTIES
+        CXX_EXTENSIONS NO
+)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
