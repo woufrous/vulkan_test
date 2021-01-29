@@ -11,8 +11,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "validation.h"
+#include "shader.h"
 #include "utils.h"
+#include "validation.h"
 
 class VulkanRenderer {
     private:
@@ -22,13 +23,17 @@ class VulkanRenderer {
         };
     public:
         VulkanRenderer(GLFWwindow* win) noexcept :
-        win_(win), inst_(), dbg_msngr_(), surf_(), dev_() {}
+        win_(win), inst_(), dbg_msngr_(), surf_(), dev_(), swap_chain_() {}
 
         ~VulkanRenderer() {
             for (auto img_view : sc_img_views_) {
-                vkDestroyImageView(dev_.logical, img_view, nullptr);
+                if (img_view != nullptr) {
+                    vkDestroyImageView(dev_.logical, img_view, nullptr);
+                }
             }
-            vkDestroySwapchainKHR(dev_.logical, swap_chain_, nullptr);
+            if (swap_chain_ != nullptr) {
+                vkDestroySwapchainKHR(dev_.logical, swap_chain_, nullptr);
+            }
             vkDestroyDevice(dev_.logical, nullptr);
 #ifndef DEBUG
             if (dbg_msngr_ != nullptr) {
@@ -53,6 +58,7 @@ class VulkanRenderer {
             create_device();
             create_logical_device();
             create_swapchain();
+            create_gfx_pipeline();
         }
 
     private:
@@ -275,6 +281,29 @@ class VulkanRenderer {
                     }
                 }
             }
+        }
+
+        void create_gfx_pipeline() {
+            auto frag_shdr_code = load_file("frag.spv");
+            auto vert_shdr_code = load_file("vert.spv");
+
+            auto frag_shdr = create_shader_module(dev_.logical, frag_shdr_code.data(), frag_shdr_code.size());
+            auto vert_shdr = create_shader_module(dev_.logical, vert_shdr_code.data(), vert_shdr_code.size());
+
+            auto pl_vert_info = VkPipelineShaderStageCreateInfo{};
+            pl_vert_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            pl_vert_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
+            pl_vert_info.pName = "main";
+            pl_vert_info.module = vert_shdr;
+
+            auto pl_frag_info = VkPipelineShaderStageCreateInfo{};
+            pl_frag_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            pl_frag_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+            pl_frag_info.pName = "main";
+            pl_frag_info.module = frag_shdr;
+
+            vkDestroyShaderModule(dev_.logical, frag_shdr, nullptr);
+            vkDestroyShaderModule(dev_.logical, vert_shdr, nullptr);
         }
 
         VkExtent2D get_image_extent(const VkSurfaceCapabilitiesKHR& sfc_caps) const {
