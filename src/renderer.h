@@ -14,18 +14,6 @@
 #include "validation.h"
 #include "utils.h"
 
-class VulkanError : public std::runtime_error {
-    public:
-        VulkanError(const char* what, VkResult ec) :
-        std::runtime_error(what), ec_(ec) {}
-
-        VkResult get_error() const noexcept {
-            return ec_;
-        }
-    private:
-        VkResult ec_;
-};
-
 class VulkanRenderer {
     private:
         struct Queue {
