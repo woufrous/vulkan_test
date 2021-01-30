@@ -26,6 +26,9 @@ class VulkanRenderer {
         win_(win) {}
 
         ~VulkanRenderer() {
+            for (auto fb : sc_framebuffers_) {
+                vkDestroyFramebuffer(dev_.logical, fb, nullptr);
+            }
             if (pipeline_ != nullptr) {
                 vkDestroyPipeline(dev_.logical, pipeline_, nullptr);
             }
@@ -69,6 +72,7 @@ class VulkanRenderer {
             create_swapchain();
             create_render_pass();
             create_gfx_pipeline();
+            create_framebuffers();
         }
 
     private:
@@ -425,6 +429,32 @@ class VulkanRenderer {
             vkDestroyShaderModule(dev_.logical, vert_shdr, nullptr);
         }
 
+        void create_framebuffers() {
+            sc_framebuffers_.resize(sc_img_views_.size());
+
+            for (size_t i=0; i<sc_img_views_.size(); ++i) {
+                VkImageView attached[] = {
+                    sc_img_views_[i],
+                };
+
+                auto fb_info = VkFramebufferCreateInfo{};
+                fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+                fb_info.renderPass = render_pass_;
+                fb_info.attachmentCount = sizeof(attached)/sizeof(attached[0]);
+                fb_info.pAttachments = attached;
+                fb_info.width = swapchain_settings_.extent.width;
+                fb_info.height = swapchain_settings_.extent.height;
+                fb_info.layers = 1;
+
+                {
+                    auto res = vkCreateFramebuffer(dev_.logical, &fb_info, nullptr, &sc_framebuffers_[i]);
+                    if (res != VK_SUCCESS) {
+                        throw VulkanError("Error creating Framebuffer", res);
+                    }
+                }
+            }
+        }
+
         void create_render_pass() {
             auto color_attachment = VkAttachmentDescription{};
             color_attachment.format = swapchain_settings_.format;
@@ -548,6 +578,7 @@ class VulkanRenderer {
         } swapchain_settings_;
         std::vector<VkImage> sc_imgs_;
         std::vector<VkImageView> sc_img_views_;
+        std::vector<VkFramebuffer> sc_framebuffers_;
         VkRenderPass render_pass_;
         VkPipelineLayout pl_layout_;
         VkPipeline pipeline_;
