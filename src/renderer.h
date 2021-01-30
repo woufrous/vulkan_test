@@ -26,6 +26,9 @@ class VulkanRenderer {
         win_(win) {}
 
         ~VulkanRenderer() {
+            if (command_pool_ != nullptr) {
+                vkDestroyCommandPool(dev_.logical, command_pool_, nullptr);
+            }
             for (auto fb : sc_framebuffers_) {
                 vkDestroyFramebuffer(dev_.logical, fb, nullptr);
             }
@@ -73,6 +76,7 @@ class VulkanRenderer {
             create_render_pass();
             create_gfx_pipeline();
             create_framebuffers();
+            create_command_pool();
         }
 
     private:
@@ -455,6 +459,20 @@ class VulkanRenderer {
             }
         }
 
+        void create_command_pool() {
+            auto pool_info = VkCommandPoolCreateInfo{};
+            pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+            pool_info.queueFamilyIndex = queues_.graphics.idx;
+            pool_info.flags = 0;
+
+            {
+                auto res = vkCreateCommandPool(dev_.logical, &pool_info, nullptr, &command_pool_);
+                if (res != VK_SUCCESS) {
+                    throw VulkanError("Error creating CommandPool", res);
+                }
+            }
+        }
+
         void create_render_pass() {
             auto color_attachment = VkAttachmentDescription{};
             color_attachment.format = swapchain_settings_.format;
@@ -582,4 +600,5 @@ class VulkanRenderer {
         VkRenderPass render_pass_;
         VkPipelineLayout pl_layout_;
         VkPipeline pipeline_;
+        VkCommandPool command_pool_;
 };
