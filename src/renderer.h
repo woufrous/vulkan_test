@@ -77,6 +77,7 @@ class VulkanRenderer {
             create_gfx_pipeline();
             create_framebuffers();
             create_command_pool();
+            create_command_buffers();
         }
 
     private:
@@ -473,6 +474,58 @@ class VulkanRenderer {
             }
         }
 
+        void create_command_buffers() {
+            command_buffers_.resize(sc_framebuffers_.size());
+            auto buffer_info = VkCommandBufferAllocateInfo{};
+            buffer_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            buffer_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            buffer_info.commandPool = command_pool_;
+            buffer_info.commandBufferCount = static_cast<uint32_t>(command_buffers_.size());
+
+            {
+                auto res = vkAllocateCommandBuffers(dev_.logical, &buffer_info, command_buffers_.data());
+                if (res != VK_SUCCESS) {
+                    throw VulkanError("Error creating CommandBuffers", res);
+                }
+            }
+
+            auto begin_info = VkCommandBufferBeginInfo{};
+            begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            begin_info.pInheritanceInfo = nullptr;
+            begin_info.flags = 0;
+            for (size_t i=0; i<command_buffers_.size(); ++i) {
+                {
+                    auto res = vkBeginCommandBuffer(command_buffers_[i], &begin_info);
+                    if (res != VK_SUCCESS)
+                    {
+                        throw VulkanError("Error begin CommandBuffer recording", res);
+                    }
+                }
+
+                auto rp_begin_info = VkRenderPassBeginInfo{};
+                rp_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+                rp_begin_info.framebuffer = sc_framebuffers_[i];
+                rp_begin_info.renderPass = render_pass_;
+                rp_begin_info.renderArea.offset = VkOffset2D{0, 0};
+                rp_begin_info.renderArea.extent = swapchain_settings_.extent;
+                auto clear_color = VkClearValue{0.0f, 0.0f, 0.0f, 1.0f};
+                rp_begin_info.clearValueCount = 1;
+                rp_begin_info.pClearValues = &clear_color;
+                vkCmdBeginRenderPass(command_buffers_[i], &rp_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+
+                vkCmdBindPipeline(command_buffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+                vkCmdDraw(command_buffers_[i], 3, 1, 0, 0);
+                vkCmdEndRenderPass(command_buffers_[i]);
+                {
+                    auto res = vkEndCommandBuffer(command_buffers_[i]);
+                    if (res != VK_SUCCESS)
+                    {
+                        throw VulkanError("Error begin CommandBuffer recording", res);
+                    }
+                }
+            }
+        }
+
         void create_render_pass() {
             auto color_attachment = VkAttachmentDescription{};
             color_attachment.format = swapchain_settings_.format;
@@ -601,4 +654,5 @@ class VulkanRenderer {
         VkPipelineLayout pl_layout_;
         VkPipeline pipeline_;
         VkCommandPool command_pool_;
+        std::vector<VkCommandBuffer> command_buffers_;
 };
