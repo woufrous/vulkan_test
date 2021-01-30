@@ -23,9 +23,12 @@ class VulkanRenderer {
         };
     public:
         VulkanRenderer(GLFWwindow* win) noexcept :
-        win_(win), inst_(), dbg_msngr_(), surf_(), dev_(), swap_chain_() {}
+        win_(win) {}
 
         ~VulkanRenderer() {
+            if (pl_layout_ != nullptr) {
+                vkDestroyPipelineLayout(dev_.logical, pl_layout_, nullptr);
+            }
             for (auto img_view : sc_img_views_) {
                 if (img_view != nullptr) {
                     vkDestroyImageView(dev_.logical, img_view, nullptr);
@@ -302,6 +305,86 @@ class VulkanRenderer {
             pl_frag_info.pName = "main";
             pl_frag_info.module = frag_shdr;
 
+            auto vert_input_info = VkPipelineVertexInputStateCreateInfo{};
+            vert_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+            vert_input_info.vertexAttributeDescriptionCount = 0;
+            vert_input_info.pVertexAttributeDescriptions = nullptr;
+            vert_input_info.vertexBindingDescriptionCount = 0;
+            vert_input_info.pVertexBindingDescriptions = nullptr;
+
+            auto input_assembly_info = VkPipelineInputAssemblyStateCreateInfo{};
+            input_assembly_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+            input_assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+            input_assembly_info.primitiveRestartEnable = VK_FALSE;
+
+            auto viewport = VkViewport{};
+            viewport.x = 0.0f;
+            viewport.y = 0.0f;
+            viewport.width = static_cast<float>(swapchain_settings_.extent.width);
+            viewport.height = static_cast<float>(swapchain_settings_.extent.height);
+            viewport.minDepth = 0.0f;
+            viewport.maxDepth = 1.0f;
+
+            auto scissor = VkRect2D{};
+            scissor.offset = VkOffset2D{0, 0};
+            scissor.extent = swapchain_settings_.extent;
+
+            auto viewport_info = VkPipelineViewportStateCreateInfo{};
+            viewport_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+            viewport_info.viewportCount = 1;
+            viewport_info.pViewports = &viewport;
+            viewport_info.scissorCount = 1;
+            viewport_info.pScissors = &scissor;
+
+            auto rasterizer_info = VkPipelineRasterizationStateCreateInfo{};
+            rasterizer_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+            rasterizer_info.depthClampEnable = VK_FALSE;
+            rasterizer_info.rasterizerDiscardEnable = VK_FALSE;
+            rasterizer_info.polygonMode = VK_POLYGON_MODE_FILL;
+            rasterizer_info.lineWidth = 1.0f;
+            rasterizer_info.cullMode = VK_CULL_MODE_BACK_BIT;
+            rasterizer_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
+            rasterizer_info.depthBiasEnable = VK_FALSE;
+
+            auto ms_info = VkPipelineMultisampleStateCreateInfo{};
+            ms_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+            ms_info.sampleShadingEnable = VK_FALSE;
+            ms_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+            auto blend_attachment_info = VkPipelineColorBlendAttachmentState{};
+            blend_attachment_info.colorWriteMask = (
+                VK_COLOR_COMPONENT_R_BIT |
+                VK_COLOR_COMPONENT_G_BIT |
+                VK_COLOR_COMPONENT_B_BIT |
+                VK_COLOR_COMPONENT_A_BIT
+            );
+            blend_attachment_info.blendEnable = VK_FALSE;
+
+            auto blend_global_info = VkPipelineColorBlendStateCreateInfo{};
+            blend_global_info.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+            blend_global_info.attachmentCount = 1;
+            blend_global_info.pAttachments = &blend_attachment_info;
+            blend_global_info.logicOpEnable = VK_FALSE;
+
+            VkDynamicState dyn_states[] = {
+                VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT,
+                VkDynamicState::VK_DYNAMIC_STATE_LINE_WIDTH,
+            };
+            auto dyn_state_info = VkPipelineDynamicStateCreateInfo{};
+            dyn_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+            dyn_state_info.dynamicStateCount = sizeof(dyn_states) / sizeof(dyn_states[0]);
+            dyn_state_info.pDynamicStates = dyn_states;
+
+            auto pl_layout_info = VkPipelineLayoutCreateInfo{};
+            pl_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+
+            {
+                auto res = vkCreatePipelineLayout(dev_.logical, &pl_layout_info, nullptr, &pl_layout_);
+                if (res != VK_SUCCESS) {
+                    throw VulkanError("Error creating PipelineLayout", res);
+                }
+            }
+
             vkDestroyShaderModule(dev_.logical, frag_shdr, nullptr);
             vkDestroyShaderModule(dev_.logical, vert_shdr, nullptr);
         }
@@ -394,4 +477,5 @@ class VulkanRenderer {
         } swapchain_settings_;
         std::vector<VkImage> sc_imgs_;
         std::vector<VkImageView> sc_img_views_;
+        VkPipelineLayout pl_layout_;
 };
