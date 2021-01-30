@@ -26,6 +26,9 @@ class VulkanRenderer {
         win_(win) {}
 
         ~VulkanRenderer() {
+            if (pipeline_ != nullptr) {
+                vkDestroyPipeline(dev_.logical, pipeline_, nullptr);
+            }
             if (pl_layout_ != nullptr) {
                 vkDestroyPipelineLayout(dev_.logical, pl_layout_, nullptr);
             }
@@ -309,6 +312,8 @@ class VulkanRenderer {
             pl_frag_info.pName = "main";
             pl_frag_info.module = frag_shdr;
 
+            VkPipelineShaderStageCreateInfo shader_stages[] = { pl_vert_info, pl_frag_info };
+
             auto vert_input_info = VkPipelineVertexInputStateCreateInfo{};
             vert_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
             vert_input_info.vertexAttributeDescriptionCount = 0;
@@ -386,6 +391,33 @@ class VulkanRenderer {
                 auto res = vkCreatePipelineLayout(dev_.logical, &pl_layout_info, nullptr, &pl_layout_);
                 if (res != VK_SUCCESS) {
                     throw VulkanError("Error creating PipelineLayout", res);
+                }
+            }
+
+            auto pl_info = VkGraphicsPipelineCreateInfo{};
+            pl_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+            pl_info.stageCount = 2;
+            pl_info.pStages = shader_stages;
+            pl_info.pVertexInputState = &vert_input_info;
+            pl_info.pInputAssemblyState = &input_assembly_info;
+            pl_info.pViewportState = &viewport_info;
+            pl_info.pRasterizationState = &rasterizer_info;
+            pl_info.pMultisampleState = &ms_info;
+            pl_info.pDepthStencilState = nullptr;
+            pl_info.pColorBlendState = &blend_global_info;
+            pl_info.pDynamicState = nullptr;
+            pl_info.layout = pl_layout_;
+            pl_info.renderPass = render_pass_;
+            pl_info.subpass = 0;
+            pl_info.basePipelineHandle = VK_NULL_HANDLE;
+            pl_info.basePipelineIndex = -1;
+
+            {
+                auto res = vkCreateGraphicsPipelines(dev_.logical, VK_NULL_HANDLE, 1, &pl_info, nullptr, &pipeline_);
+                if (res != VK_SUCCESS) {
+                    vkDestroyShaderModule(dev_.logical, frag_shdr, nullptr);
+                    vkDestroyShaderModule(dev_.logical, vert_shdr, nullptr);
+                    throw VulkanError("Error creating pipeline", res);
                 }
             }
 
@@ -518,4 +550,5 @@ class VulkanRenderer {
         std::vector<VkImageView> sc_img_views_;
         VkRenderPass render_pass_;
         VkPipelineLayout pl_layout_;
+        VkPipeline pipeline_;
 };
