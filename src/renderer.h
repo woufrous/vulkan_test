@@ -29,6 +29,9 @@ class VulkanRenderer {
             if (pl_layout_ != nullptr) {
                 vkDestroyPipelineLayout(dev_.logical, pl_layout_, nullptr);
             }
+            if (render_pass_ != nullptr) {
+                vkDestroyRenderPass(dev_.logical, render_pass_, nullptr);
+            }
             for (auto img_view : sc_img_views_) {
                 if (img_view != nullptr) {
                     vkDestroyImageView(dev_.logical, img_view, nullptr);
@@ -61,6 +64,7 @@ class VulkanRenderer {
             create_device();
             create_logical_device();
             create_swapchain();
+            create_render_pass();
             create_gfx_pipeline();
         }
 
@@ -389,6 +393,41 @@ class VulkanRenderer {
             vkDestroyShaderModule(dev_.logical, vert_shdr, nullptr);
         }
 
+        void create_render_pass() {
+            auto color_attachment = VkAttachmentDescription{};
+            color_attachment.format = swapchain_settings_.format;
+            color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+            color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+            auto color_attachment_ref = VkAttachmentReference{};
+            color_attachment_ref.attachment = 0;
+            color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+            auto subpass = VkSubpassDescription{};
+            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+            subpass.colorAttachmentCount = 1;
+            subpass.pColorAttachments = &color_attachment_ref;
+
+            auto renderpass_info = VkRenderPassCreateInfo{};
+            renderpass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+            renderpass_info.attachmentCount = 1;
+            renderpass_info.pAttachments = &color_attachment;
+            renderpass_info.subpassCount = 1;
+            renderpass_info.pSubpasses = &subpass;
+
+            {
+                auto res = vkCreateRenderPass(dev_.logical, &renderpass_info, nullptr, &render_pass_);
+                if (res != VK_SUCCESS) {
+                    throw VulkanError("Error creating RenderPass", res);
+                }
+            }
+        }
+
         VkExtent2D get_image_extent(const VkSurfaceCapabilitiesKHR& sfc_caps) const {
             if (sfc_caps.currentExtent.width != UINT32_MAX) {
                 return sfc_caps.currentExtent;
@@ -477,5 +516,6 @@ class VulkanRenderer {
         } swapchain_settings_;
         std::vector<VkImage> sc_imgs_;
         std::vector<VkImageView> sc_img_views_;
+        VkRenderPass render_pass_;
         VkPipelineLayout pl_layout_;
 };
