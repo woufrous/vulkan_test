@@ -26,6 +26,12 @@ class VulkanRenderer {
         win_(win) {}
 
         ~VulkanRenderer() {
+            if (render_finished_ != nullptr) {
+                vkDestroySemaphore(dev_.logical, render_finished_, nullptr);
+            }
+            if (image_available_ != nullptr) {
+                vkDestroySemaphore(dev_.logical, image_available_, nullptr);
+            }
             if (command_pool_ != nullptr) {
                 vkDestroyCommandPool(dev_.logical, command_pool_, nullptr);
             }
@@ -78,6 +84,44 @@ class VulkanRenderer {
             create_framebuffers();
             create_command_pool();
             create_command_buffers();
+            create_semaphores();
+        }
+
+        void draw_frame() {
+            uint32_t img_idx;
+            vkAcquireNextImageKHR(dev_.logical, swap_chain_, UINT64_MAX, image_available_, VK_NULL_HANDLE, &img_idx);
+
+            auto submit_info = VkSubmitInfo{};
+            submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            VkSemaphore wait_semas[] = {image_available_};
+            VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+            submit_info.waitSemaphoreCount = sizeof(wait_semas) / sizeof(wait_semas[0]);
+            submit_info.pWaitSemaphores = wait_semas;
+            submit_info.pWaitDstStageMask = wait_stages;
+            submit_info.commandBufferCount = 1;
+            submit_info.pCommandBuffers = &command_buffers_[img_idx];
+            VkSemaphore signal_semas[] = {render_finished_};
+            submit_info.signalSemaphoreCount = 1;
+            submit_info.pSignalSemaphores = signal_semas;
+
+            {
+                auto res = vkQueueSubmit(queues_.graphics.queue, 1, &submit_info, VK_NULL_HANDLE);
+                if (res != VK_SUCCESS) {
+                    VulkanError("Error submitting Queue", res);
+                }
+            }
+
+            auto pres_info = VkPresentInfoKHR{};
+            pres_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+            pres_info.waitSemaphoreCount = sizeof(signal_semas) / sizeof(signal_semas[0]);
+            pres_info.pWaitSemaphores = signal_semas;
+            VkSwapchainKHR swapchains[] = {swap_chain_};
+            pres_info.swapchainCount = sizeof(swapchains) / sizeof(swapchains[0]);
+            pres_info.pSwapchains = swapchains;
+            pres_info.pImageIndices = &img_idx;
+            pres_info.pResults = nullptr;
+
+            vkQueuePresentKHR(queues_.present.queue, &pres_info);
         }
 
     private:
@@ -526,6 +570,23 @@ class VulkanRenderer {
             }
         }
 
+        void create_semaphores() {
+            auto sema_info = VkSemaphoreCreateInfo{};
+            sema_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+            {
+                auto res = vkCreateSemaphore(dev_.logical, &sema_info, nullptr, &image_available_);
+                if (res != VK_SUCCESS) {
+                    throw VulkanError("Error creating Semaphore", res);
+                }
+            }
+            {
+                auto res = vkCreateSemaphore(dev_.logical, &sema_info, nullptr, &render_finished_);
+                if (res != VK_SUCCESS) {
+                    throw VulkanError("Error creating Semaphore", res);
+                }
+            }
+        }
+
         void create_render_pass() {
             auto color_attachment = VkAttachmentDescription{};
             color_attachment.format = swapchain_settings_.format;
@@ -546,12 +607,22 @@ class VulkanRenderer {
             subpass.colorAttachmentCount = 1;
             subpass.pColorAttachments = &color_attachment_ref;
 
+            auto subpass_dep = VkSubpassDependency{};
+            subpass_dep.srcSubpass = VK_SUBPASS_EXTERNAL;
+            subpass_dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            subpass_dep.srcAccessMask = 0;
+            subpass_dep.dstSubpass = 0;
+            subpass_dep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            subpass_dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
             auto renderpass_info = VkRenderPassCreateInfo{};
             renderpass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
             renderpass_info.attachmentCount = 1;
             renderpass_info.pAttachments = &color_attachment;
             renderpass_info.subpassCount = 1;
             renderpass_info.pSubpasses = &subpass;
+            renderpass_info.dependencyCount = 1;
+            renderpass_info.pDependencies = &subpass_dep;
 
             {
                 auto res = vkCreateRenderPass(dev_.logical, &renderpass_info, nullptr, &render_pass_);
@@ -655,4 +726,6 @@ class VulkanRenderer {
         VkPipeline pipeline_;
         VkCommandPool command_pool_;
         std::vector<VkCommandBuffer> command_buffers_;
+        VkSemaphore image_available_;
+        VkSemaphore render_finished_;
 };

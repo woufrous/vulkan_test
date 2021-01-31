@@ -62,6 +62,7 @@ int main(int argc, char* argv[]) {
     // main loop
     while (!glfwWindowShouldClose(win.get())) {
         glfwPollEvents();
+        renderer.draw_frame();
     }
 
     // terminate GLFW
