@@ -63,7 +63,7 @@ class VulkanRenderer {
                 vkDestroySwapchainKHR(dev_.logical, swap_chain_, nullptr);
             }
             vkDestroyDevice(dev_.logical, nullptr);
-#ifndef DEBUG
+#ifndef NDEBUG
             if (dbg_msngr_ != nullptr) {
                 auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
                     vkGetInstanceProcAddr(inst_, "vkDestroyDebugUtilsMessengerEXT")
