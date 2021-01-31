@@ -34,14 +34,12 @@ int main(int argc, char* argv[]) {
     // create window
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    auto win = std::shared_ptr<GLFWwindow>(
-        glfwCreateWindow(800, 600, "Vulkan Test", nullptr, nullptr),
-        [](auto win) {
-            glfwDestroyWindow(win);
-        }
-    );
+    auto win = glfwCreateWindow(800, 600, "Vulkan Test", nullptr, nullptr);
+    if (win == nullptr) {
+        std::cerr << "Error creating Window" << std::endl;
+    }
 
-    auto renderer = VulkanRenderer(win.get());
+    auto renderer = VulkanRenderer(win);
     try {
         renderer.init();
     }
@@ -60,11 +58,13 @@ int main(int argc, char* argv[]) {
     }
 
     // main loop
-    while (!glfwWindowShouldClose(win.get())) {
+    while (!glfwWindowShouldClose(win)) {
         glfwPollEvents();
         renderer.draw_frame();
     }
+    renderer.destroy();
 
+    glfwDestroyWindow(win);
     // terminate GLFW
     glfwTerminate();
 

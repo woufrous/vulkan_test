@@ -26,8 +26,8 @@ class VulkanRenderer {
         VulkanRenderer(GLFWwindow* win) noexcept :
         win_(win) {}
 
-        ~VulkanRenderer() {
-            vkQueueWaitIdle(queues_.present.queue);
+        void destroy() {
+            vkDeviceWaitIdle(dev_.logical);
             for (size_t i=0; i<MAX_FRAMES_IN_FLIGHT; ++i) {
                 if (render_finished_[i] != nullptr) {
                     vkDestroySemaphore(dev_.logical, render_finished_[i], nullptr);
