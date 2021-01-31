@@ -33,8 +33,8 @@ int main(int argc, char* argv[]) {
 
     // create window
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     auto win = glfwCreateWindow(800, 600, "Vulkan Test", nullptr, nullptr);
+    glfwSetFramebufferSizeCallback(win, VulkanRenderer::win_resize_handler);
     if (win == nullptr) {
         std::cerr << "Error creating Window" << std::endl;
     }
@@ -42,27 +42,29 @@ int main(int argc, char* argv[]) {
     auto renderer = VulkanRenderer(win);
     try {
         renderer.init();
+        glfwSetWindowUserPointer(win, reinterpret_cast<void*>(&renderer));
+
+        while (!glfwWindowShouldClose(win)) {
+            glfwPollEvents();
+            renderer.draw_frame();
+        }
+        renderer.destroy();
     }
     catch (const VulkanError& ex) {
         std::cerr << ex.what() << std::endl;
         std::cerr << "Errorcode: " << ex.get_error() << std::endl;
 
+        glfwDestroyWindow(win);
         glfwTerminate();
         return 1;
     }
     catch (...) {
         std::cerr << "Unhandled exception!" << std::endl;
 
+        glfwDestroyWindow(win);
         glfwTerminate();
         return 1;
     }
-
-    // main loop
-    while (!glfwWindowShouldClose(win)) {
-        glfwPollEvents();
-        renderer.draw_frame();
-    }
-    renderer.destroy();
 
     glfwDestroyWindow(win);
     // terminate GLFW

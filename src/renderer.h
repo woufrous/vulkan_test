@@ -39,28 +39,9 @@ class VulkanRenderer {
                     vkDestroyFence(dev_.logical, frame_done_[i], nullptr);
                 }
             }
+            cleanup_swapchain();
             if (command_pool_ != nullptr) {
                 vkDestroyCommandPool(dev_.logical, command_pool_, nullptr);
-            }
-            for (auto fb : sc_framebuffers_) {
-                vkDestroyFramebuffer(dev_.logical, fb, nullptr);
-            }
-            if (pipeline_ != nullptr) {
-                vkDestroyPipeline(dev_.logical, pipeline_, nullptr);
-            }
-            if (pl_layout_ != nullptr) {
-                vkDestroyPipelineLayout(dev_.logical, pl_layout_, nullptr);
-            }
-            if (render_pass_ != nullptr) {
-                vkDestroyRenderPass(dev_.logical, render_pass_, nullptr);
-            }
-            for (auto img_view : sc_img_views_) {
-                if (img_view != nullptr) {
-                    vkDestroyImageView(dev_.logical, img_view, nullptr);
-                }
-            }
-            if (swap_chain_ != nullptr) {
-                vkDestroySwapchainKHR(dev_.logical, swap_chain_, nullptr);
             }
             vkDestroyDevice(dev_.logical, nullptr);
 #ifndef NDEBUG
@@ -98,7 +79,18 @@ class VulkanRenderer {
             vkWaitForFences(dev_.logical, 1, &frame_done_[curr_frame_], VK_TRUE, UINT64_MAX);
 
             uint32_t img_idx;
-            vkAcquireNextImageKHR(dev_.logical, swap_chain_, UINT64_MAX, image_available_[curr_frame_], VK_NULL_HANDLE, &img_idx);
+            {
+                auto res = vkAcquireNextImageKHR(
+                    dev_.logical, swap_chain_, UINT64_MAX,
+                    image_available_[curr_frame_], VK_NULL_HANDLE, &img_idx
+                );
+                if (res == VK_ERROR_OUT_OF_DATE_KHR) {
+                    recreate_swapchain();
+                    return;
+                } else if (res != VK_SUCCESS) {
+                    throw VulkanError("Error aquiring Swapchain Image", res);
+                }
+            }
 
             if (frame_in_flight_[img_idx] != VK_NULL_HANDLE) {
                 vkWaitForFences(dev_.logical, 1, &frame_in_flight_[img_idx], VK_TRUE, UINT64_MAX);
@@ -122,7 +114,7 @@ class VulkanRenderer {
             {
                 auto res = vkQueueSubmit(queues_.graphics.queue, 1, &submit_info, frame_done_[curr_frame_]);
                 if (res != VK_SUCCESS) {
-                    VulkanError("Error submitting Queue", res);
+                    throw VulkanError("Error submitting Queue", res);
                 }
             }
 
@@ -136,8 +128,20 @@ class VulkanRenderer {
             pres_info.pImageIndices = &img_idx;
             pres_info.pResults = nullptr;
 
-            vkQueuePresentKHR(queues_.present.queue, &pres_info);
+            {
+                auto res = vkQueuePresentKHR(queues_.present.queue, &pres_info);
+                if ((res == VK_ERROR_OUT_OF_DATE_KHR) || (res == VK_SUBOPTIMAL_KHR) || window_resized_) {
+                    recreate_swapchain();
+                } else if (res != VK_SUCCESS) {
+                    throw VulkanError("Error presenting Queue", res);
+                }
+            }
             curr_frame_ = (curr_frame_+1) % MAX_FRAMES_IN_FLIGHT;
+        }
+
+        static void win_resize_handler(GLFWwindow* win, int width, int height) {
+            auto renderer = reinterpret_cast<VulkanRenderer*>(glfwGetWindowUserPointer(win));
+            renderer->window_resized_ = true;
         }
 
     private:
@@ -360,6 +364,44 @@ class VulkanRenderer {
                     }
                 }
             }
+        }
+
+        void cleanup_swapchain() {
+            vkFreeCommandBuffers(dev_.logical, command_pool_, static_cast<uint32_t>(command_buffers_.size()), command_buffers_.data());
+            for (auto fb : sc_framebuffers_) {
+                vkDestroyFramebuffer(dev_.logical, fb, nullptr);
+            }
+            if (pipeline_ != nullptr) {
+                vkDestroyPipeline(dev_.logical, pipeline_, nullptr);
+            }
+            if (pl_layout_ != nullptr) {
+                vkDestroyPipelineLayout(dev_.logical, pl_layout_, nullptr);
+            }
+            if (render_pass_ != nullptr) {
+                vkDestroyRenderPass(dev_.logical, render_pass_, nullptr);
+            }
+            for (auto img_view : sc_img_views_) {
+                if (img_view != nullptr) {
+                    vkDestroyImageView(dev_.logical, img_view, nullptr);
+                }
+            }
+            if (swap_chain_ != nullptr) {
+                vkDestroySwapchainKHR(dev_.logical, swap_chain_, nullptr);
+            }
+        }
+
+        void recreate_swapchain() {
+            vkDeviceWaitIdle(dev_.logical);
+
+            cleanup_swapchain();
+
+            create_swapchain();
+            create_render_pass();
+            create_gfx_pipeline();
+            create_framebuffers();
+            create_command_buffers();
+
+            window_resized_ = false;
         }
 
         void create_gfx_pipeline() {
@@ -764,5 +806,6 @@ class VulkanRenderer {
         std::vector<VkSemaphore> render_finished_;
         std::vector<VkFence> frame_done_;
         std::vector<VkFence> frame_in_flight_;
-        uint8_t curr_frame_=0;
+        uint8_t curr_frame_ = 0;
+        bool window_resized_ = false;
 };
