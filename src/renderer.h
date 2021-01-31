@@ -22,15 +22,22 @@ class VulkanRenderer {
             VkQueue queue;
         };
     public:
+        static const uint8_t MAX_FRAMES_IN_FLIGHT = 2;
         VulkanRenderer(GLFWwindow* win) noexcept :
         win_(win) {}
 
         ~VulkanRenderer() {
-            if (render_finished_ != nullptr) {
-                vkDestroySemaphore(dev_.logical, render_finished_, nullptr);
-            }
-            if (image_available_ != nullptr) {
-                vkDestroySemaphore(dev_.logical, image_available_, nullptr);
+            vkQueueWaitIdle(queues_.present.queue);
+            for (size_t i=0; i<MAX_FRAMES_IN_FLIGHT; ++i) {
+                if (render_finished_[i] != nullptr) {
+                    vkDestroySemaphore(dev_.logical, render_finished_[i], nullptr);
+                }
+                if (image_available_[i] != nullptr) {
+                    vkDestroySemaphore(dev_.logical, image_available_[i], nullptr);
+                }
+                if (frame_done_[i] != nullptr) {
+                    vkDestroyFence(dev_.logical, frame_done_[i], nullptr);
+                }
             }
             if (command_pool_ != nullptr) {
                 vkDestroyCommandPool(dev_.logical, command_pool_, nullptr);
@@ -88,24 +95,32 @@ class VulkanRenderer {
         }
 
         void draw_frame() {
+            vkWaitForFences(dev_.logical, 1, &frame_done_[curr_frame_], VK_TRUE, UINT64_MAX);
+
             uint32_t img_idx;
-            vkAcquireNextImageKHR(dev_.logical, swap_chain_, UINT64_MAX, image_available_, VK_NULL_HANDLE, &img_idx);
+            vkAcquireNextImageKHR(dev_.logical, swap_chain_, UINT64_MAX, image_available_[curr_frame_], VK_NULL_HANDLE, &img_idx);
+
+            if (frame_in_flight_[img_idx] != VK_NULL_HANDLE) {
+                vkWaitForFences(dev_.logical, 1, &frame_in_flight_[img_idx], VK_TRUE, UINT64_MAX);
+            }
+            frame_in_flight_[img_idx] = frame_done_[curr_frame_];
 
             auto submit_info = VkSubmitInfo{};
             submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-            VkSemaphore wait_semas[] = {image_available_};
+            VkSemaphore wait_semas[] = {image_available_[curr_frame_]};
             VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
             submit_info.waitSemaphoreCount = sizeof(wait_semas) / sizeof(wait_semas[0]);
             submit_info.pWaitSemaphores = wait_semas;
             submit_info.pWaitDstStageMask = wait_stages;
             submit_info.commandBufferCount = 1;
             submit_info.pCommandBuffers = &command_buffers_[img_idx];
-            VkSemaphore signal_semas[] = {render_finished_};
+            VkSemaphore signal_semas[] = {render_finished_[curr_frame_]};
             submit_info.signalSemaphoreCount = 1;
             submit_info.pSignalSemaphores = signal_semas;
 
+            vkResetFences(dev_.logical, 1, &frame_done_[curr_frame_]);
             {
-                auto res = vkQueueSubmit(queues_.graphics.queue, 1, &submit_info, VK_NULL_HANDLE);
+                auto res = vkQueueSubmit(queues_.graphics.queue, 1, &submit_info, frame_done_[curr_frame_]);
                 if (res != VK_SUCCESS) {
                     VulkanError("Error submitting Queue", res);
                 }
@@ -122,6 +137,7 @@ class VulkanRenderer {
             pres_info.pResults = nullptr;
 
             vkQueuePresentKHR(queues_.present.queue, &pres_info);
+            curr_frame_ = (curr_frame_+1) % MAX_FRAMES_IN_FLIGHT;
         }
 
     private:
@@ -571,18 +587,36 @@ class VulkanRenderer {
         }
 
         void create_semaphores() {
+            image_available_.resize(MAX_FRAMES_IN_FLIGHT);
+            render_finished_.resize(MAX_FRAMES_IN_FLIGHT);
+            frame_done_.resize(MAX_FRAMES_IN_FLIGHT);
+            frame_in_flight_.resize(sc_imgs_.size(), VK_NULL_HANDLE);
+
             auto sema_info = VkSemaphoreCreateInfo{};
             sema_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-            {
-                auto res = vkCreateSemaphore(dev_.logical, &sema_info, nullptr, &image_available_);
-                if (res != VK_SUCCESS) {
-                    throw VulkanError("Error creating Semaphore", res);
+
+            auto fence_info = VkFenceCreateInfo{};
+            fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+            fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+            for (size_t i=0; i<MAX_FRAMES_IN_FLIGHT; ++i) {
+                {
+                    auto res = vkCreateSemaphore(dev_.logical, &sema_info, nullptr, &image_available_[i]);
+                    if (res != VK_SUCCESS) {
+                        throw VulkanError("Error creating Semaphore", res);
+                    }
                 }
-            }
-            {
-                auto res = vkCreateSemaphore(dev_.logical, &sema_info, nullptr, &render_finished_);
-                if (res != VK_SUCCESS) {
-                    throw VulkanError("Error creating Semaphore", res);
+                {
+                    auto res = vkCreateSemaphore(dev_.logical, &sema_info, nullptr, &render_finished_[i]);
+                    if (res != VK_SUCCESS) {
+                        throw VulkanError("Error creating Semaphore", res);
+                    }
+                }
+                {
+                    auto res = vkCreateFence(dev_.logical, &fence_info, nullptr, &frame_done_[i]);
+                    if (res != VK_SUCCESS) {
+                        throw VulkanError("Error creating Fence", res);
+                    }
                 }
             }
         }
@@ -726,6 +760,9 @@ class VulkanRenderer {
         VkPipeline pipeline_;
         VkCommandPool command_pool_;
         std::vector<VkCommandBuffer> command_buffers_;
-        VkSemaphore image_available_;
-        VkSemaphore render_finished_;
+        std::vector<VkSemaphore> image_available_;
+        std::vector<VkSemaphore> render_finished_;
+        std::vector<VkFence> frame_done_;
+        std::vector<VkFence> frame_in_flight_;
+        uint8_t curr_frame_=0;
 };
