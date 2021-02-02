@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <exception>
 #include <memory>
 #include <optional>
@@ -41,6 +42,12 @@ class VulkanRenderer {
                 }
             }
             cleanup_swapchain();
+            if (vert_buffer_ != VK_NULL_HANDLE) {
+                vkDestroyBuffer(dev_.logical, vert_buffer_, nullptr);
+            }
+            if (vert_mem_ != VK_NULL_HANDLE) {
+                vkFreeMemory(dev_.logical, vert_mem_, nullptr);
+            }
             if (command_pool_ != nullptr) {
                 vkDestroyCommandPool(dev_.logical, command_pool_, nullptr);
             }
@@ -72,6 +79,7 @@ class VulkanRenderer {
             create_gfx_pipeline();
             create_framebuffers();
             create_command_pool();
+            create_vert_buffer();
             create_command_buffers();
             create_semaphores();
         }
@@ -580,6 +588,46 @@ class VulkanRenderer {
             }
         }
 
+        void create_vert_buffer() {
+            auto buf_info = VkBufferCreateInfo{};
+            buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+            buf_info.size = vertices.size() * sizeof(vertices[0]);
+            buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            buf_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+
+            {
+                auto res = vkCreateBuffer(dev_.logical, &buf_info, nullptr, &vert_buffer_);
+                if (res != VK_SUCCESS) {
+                    throw VulkanError("Error creating vertex Buffer", res);
+                }
+            }
+
+            auto mem_reqs = VkMemoryRequirements{};
+            vkGetBufferMemoryRequirements(dev_.logical, vert_buffer_, &mem_reqs);
+            auto mem_props = VkPhysicalDeviceMemoryProperties{};
+            vkGetPhysicalDeviceMemoryProperties(dev_.physical, &mem_props);
+
+            auto malloc_info = VkMemoryAllocateInfo{};
+            malloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            malloc_info.allocationSize = mem_reqs.size;
+            // TODO: actually find matching memory type
+            malloc_info.memoryTypeIndex = 0;
+
+            {
+                auto res = vkAllocateMemory(dev_.logical, &malloc_info, nullptr, &vert_mem_);
+                if (res != VK_SUCCESS) {
+                    throw VulkanError("Error allocating Memory", res);
+                }
+            }
+
+            vkBindBufferMemory(dev_.logical, vert_buffer_, vert_mem_, 0);
+
+            void* data = nullptr;
+            vkMapMemory(dev_.logical, vert_mem_, 0, buf_info.size, 0, &data);
+            std::memcpy(data, vertices.data(), static_cast<size_t>(buf_info.size));
+            vkUnmapMemory(dev_.logical, vert_mem_);
+        }
+
         void create_command_buffers() {
             command_buffers_.resize(sc_framebuffers_.size());
             auto buffer_info = VkCommandBufferAllocateInfo{};
@@ -620,7 +668,10 @@ class VulkanRenderer {
                 vkCmdBeginRenderPass(command_buffers_[i], &rp_begin_info, VK_SUBPASS_CONTENTS_INLINE);
 
                 vkCmdBindPipeline(command_buffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-                vkCmdDraw(command_buffers_[i], 3, 1, 0, 0);
+                VkBuffer buffers[] = {vert_buffer_};
+                VkDeviceSize offsets[] = {0};
+                vkCmdBindVertexBuffers(command_buffers_[i], 0, 1, buffers, offsets);
+                vkCmdDraw(command_buffers_[i], static_cast<uint32_t>(vertices.size()), 1, 0, 0);
                 vkCmdEndRenderPass(command_buffers_[i]);
                 {
                     auto res = vkEndCommandBuffer(command_buffers_[i]);
@@ -806,6 +857,8 @@ class VulkanRenderer {
         VkPipeline pipeline_;
         VkCommandPool command_pool_;
         std::vector<VkCommandBuffer> command_buffers_;
+        VkBuffer vert_buffer_;
+        VkDeviceMemory vert_mem_;
         std::vector<VkSemaphore> image_available_;
         std::vector<VkSemaphore> render_finished_;
         std::vector<VkFence> frame_done_;
