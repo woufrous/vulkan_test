@@ -11,6 +11,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "buffer.h"
 #include "shader.h"
 #include "utils.h"
 #include "validation.h"
@@ -425,12 +426,15 @@ class VulkanRenderer {
 
             VkPipelineShaderStageCreateInfo shader_stages[] = { pl_vert_info, pl_frag_info };
 
+            auto vert_binding_desc = Vertex::get_binding_desc();
+            auto vert_attrib_desc = Vertex::get_attrib_desc();
+
             auto vert_input_info = VkPipelineVertexInputStateCreateInfo{};
             vert_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-            vert_input_info.vertexAttributeDescriptionCount = 0;
-            vert_input_info.pVertexAttributeDescriptions = nullptr;
-            vert_input_info.vertexBindingDescriptionCount = 0;
-            vert_input_info.pVertexBindingDescriptions = nullptr;
+            vert_input_info.vertexBindingDescriptionCount = 1;
+            vert_input_info.pVertexBindingDescriptions = &vert_binding_desc;
+            vert_input_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(vert_attrib_desc.size());
+            vert_input_info.pVertexAttributeDescriptions = vert_attrib_desc.data();
 
             auto input_assembly_info = VkPipelineInputAssemblyStateCreateInfo{};
             input_assembly_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
