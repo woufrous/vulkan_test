@@ -31,38 +31,24 @@ class VulkanRenderer {
         void destroy() {
             vkDeviceWaitIdle(dev_.logical);
             for (size_t i=0; i<MAX_FRAMES_IN_FLIGHT; ++i) {
-                if (render_finished_[i] != nullptr) {
-                    vkDestroySemaphore(dev_.logical, render_finished_[i], nullptr);
-                }
-                if (image_available_[i] != nullptr) {
-                    vkDestroySemaphore(dev_.logical, image_available_[i], nullptr);
-                }
-                if (frame_done_[i] != nullptr) {
-                    vkDestroyFence(dev_.logical, frame_done_[i], nullptr);
-                }
+                vkDestroySemaphore(dev_.logical, render_finished_[i], nullptr);
+                vkDestroySemaphore(dev_.logical, image_available_[i], nullptr);
+                vkDestroyFence(dev_.logical, frame_done_[i], nullptr);
             }
             cleanup_swapchain();
-            if (vert_buffer_ != VK_NULL_HANDLE) {
-                vkDestroyBuffer(dev_.logical, vert_buffer_, nullptr);
-            }
-            if (vert_mem_ != VK_NULL_HANDLE) {
-                vkFreeMemory(dev_.logical, vert_mem_, nullptr);
-            }
-            if (command_pool_ != nullptr) {
-                vkDestroyCommandPool(dev_.logical, command_pool_, nullptr);
-            }
+            vkDestroyBuffer(dev_.logical, vert_buffer_, nullptr);
+            vkFreeMemory(dev_.logical, vert_mem_, nullptr);
+            vkDestroyCommandPool(dev_.logical, command_pool_, nullptr);
             vkDestroyDevice(dev_.logical, nullptr);
 #ifndef NDEBUG
-            if (dbg_msngr_ != nullptr) {
+            {
                 auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
                     vkGetInstanceProcAddr(inst_, "vkDestroyDebugUtilsMessengerEXT")
                 );
                 func(inst_, dbg_msngr_, nullptr);
             }
 #endif
-            if (surf_ != nullptr) {
-                vkDestroySurfaceKHR(inst_, surf_, nullptr);
-            }
+            vkDestroySurfaceKHR(inst_, surf_, nullptr);
             vkDestroyInstance(inst_, nullptr);
         }
 
@@ -380,23 +366,13 @@ class VulkanRenderer {
             for (auto fb : sc_framebuffers_) {
                 vkDestroyFramebuffer(dev_.logical, fb, nullptr);
             }
-            if (pipeline_ != nullptr) {
-                vkDestroyPipeline(dev_.logical, pipeline_, nullptr);
-            }
-            if (pl_layout_ != nullptr) {
-                vkDestroyPipelineLayout(dev_.logical, pl_layout_, nullptr);
-            }
-            if (render_pass_ != nullptr) {
-                vkDestroyRenderPass(dev_.logical, render_pass_, nullptr);
-            }
+            vkDestroyPipeline(dev_.logical, pipeline_, nullptr);
+            vkDestroyPipelineLayout(dev_.logical, pl_layout_, nullptr);
+            vkDestroyRenderPass(dev_.logical, render_pass_, nullptr);
             for (auto img_view : sc_img_views_) {
-                if (img_view != nullptr) {
-                    vkDestroyImageView(dev_.logical, img_view, nullptr);
-                }
+                vkDestroyImageView(dev_.logical, img_view, nullptr);
             }
-            if (swap_chain_ != nullptr) {
-                vkDestroySwapchainKHR(dev_.logical, swap_chain_, nullptr);
-            }
+            vkDestroySwapchainKHR(dev_.logical, swap_chain_, nullptr);
         }
 
         void recreate_swapchain() {
