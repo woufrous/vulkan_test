@@ -1,5 +1,8 @@
+#include <filesystem>
 #include <iostream>
 #include <memory>
+
+#include <unistd.h>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -12,6 +15,9 @@
 
 
 int main(int argc, char* argv[]) {
+    std::cout << std::filesystem::path(argv[0]).remove_filename() << std::endl;
+    chdir(std::filesystem::path(argv[0]).remove_filename().c_str());
+
     std::cout << "GLFW: " << glfwGetVersionString() << std::endl;
 
     // initialize GLFW
