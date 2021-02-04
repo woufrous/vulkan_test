@@ -13,6 +13,7 @@
 #include <GLFW/glfw3.h>
 
 #include "buffer.h"
+#include "device.h"
 #include "shader.h"
 #include "utils.h"
 #include "validation.h"
@@ -565,42 +566,14 @@ class VulkanRenderer {
         }
 
         void create_vert_buffer() {
-            auto buf_info = VkBufferCreateInfo{};
-            buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-            buf_info.size = vertices.size() * sizeof(vertices[0]);
-            buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-            buf_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-
-            {
-                auto res = vkCreateBuffer(dev_.logical, &buf_info, nullptr, &vert_buffer_);
-                if (res != VK_SUCCESS) {
-                    throw VulkanError("Error creating vertex Buffer", res);
-                }
-            }
-
-            auto mem_reqs = VkMemoryRequirements{};
-            vkGetBufferMemoryRequirements(dev_.logical, vert_buffer_, &mem_reqs);
-            auto mem_props = VkPhysicalDeviceMemoryProperties{};
-            vkGetPhysicalDeviceMemoryProperties(dev_.physical, &mem_props);
-
-            auto malloc_info = VkMemoryAllocateInfo{};
-            malloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-            malloc_info.allocationSize = mem_reqs.size;
-            // TODO: actually find matching memory type
-            malloc_info.memoryTypeIndex = 0;
-
-            {
-                auto res = vkAllocateMemory(dev_.logical, &malloc_info, nullptr, &vert_mem_);
-                if (res != VK_SUCCESS) {
-                    throw VulkanError("Error allocating Memory", res);
-                }
-            }
-
-            vkBindBufferMemory(dev_.logical, vert_buffer_, vert_mem_, 0);
+            auto buf_desc = BufferDesc{};
+            buf_desc.size = vertices.size() * sizeof(vertices[0]);
+            buf_desc.buf_usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+            create_buffer(dev_, buf_desc, &vert_buffer_, &vert_mem_);
 
             void* data = nullptr;
-            vkMapMemory(dev_.logical, vert_mem_, 0, buf_info.size, 0, &data);
-            std::memcpy(data, vertices.data(), static_cast<size_t>(buf_info.size));
+            vkMapMemory(dev_.logical, vert_mem_, 0, buf_desc.size, 0, &data);
+            std::memcpy(data, vertices.data(), static_cast<size_t>(buf_desc.size));
             vkUnmapMemory(dev_.logical, vert_mem_);
         }
 
@@ -811,10 +784,7 @@ class VulkanRenderer {
         VkDebugUtilsMessengerEXT dbg_msngr_;
 #endif
         VkSurfaceKHR surf_;
-        struct {
-            VkPhysicalDevice physical;
-            VkDevice logical;
-        } dev_;
+        VulkanDevice dev_;
         VkSwapchainKHR swap_chain_;
         struct {
             Queue graphics;
