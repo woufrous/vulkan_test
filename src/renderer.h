@@ -568,13 +568,25 @@ class VulkanRenderer {
         void create_vert_buffer() {
             auto buf_desc = BufferDesc{};
             buf_desc.size = vertices.size() * sizeof(vertices[0]);
-            buf_desc.buf_usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-            create_buffer(dev_, buf_desc, &vert_buffer_, &vert_mem_);
+            buf_desc.buf_usage_flags = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+            buf_desc.mem_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+            auto staging_buf = VkBuffer{};
+            auto staging_mem = VkDeviceMemory{};
+            create_buffer(dev_, buf_desc, &staging_buf, &staging_mem);
 
             void* data = nullptr;
-            vkMapMemory(dev_.logical, vert_mem_, 0, buf_desc.size, 0, &data);
+            vkMapMemory(dev_.logical, staging_mem, 0, buf_desc.size, 0, &data);
             std::memcpy(data, vertices.data(), static_cast<size_t>(buf_desc.size));
-            vkUnmapMemory(dev_.logical, vert_mem_);
+            vkUnmapMemory(dev_.logical, staging_mem);
+
+            buf_desc.buf_usage_flags = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+            buf_desc.mem_prop_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+            create_buffer(dev_, buf_desc, &vert_buffer_, &vert_mem_);
+            copy_buffer(dev_, queues_.graphics.queue, command_pool_, staging_buf, vert_buffer_, buf_desc.size);
+
+            vkFreeMemory(dev_.logical, staging_mem, nullptr);
+            vkDestroyBuffer(dev_.logical, staging_buf, nullptr);
         }
 
         void create_command_buffers() {
