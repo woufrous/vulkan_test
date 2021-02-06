@@ -40,11 +40,14 @@ struct Vertex {
     }
 };
 
-inline std::vector<Vertex> vertices = {
-    Vertex{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+inline const std::vector<Vertex> vertices = {
+    Vertex{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+    Vertex{{0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
     Vertex{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
     Vertex{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
 };
+
+inline const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
 
 struct BufferDesc {
     VkDeviceSize size;

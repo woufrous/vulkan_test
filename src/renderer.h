@@ -37,8 +37,12 @@ class VulkanRenderer {
                 vkDestroyFence(dev_.logical, frame_done_[i], nullptr);
             }
             cleanup_swapchain();
+
+            vkDestroyBuffer(dev_.logical, idx_buffer_, nullptr);
+            vkFreeMemory(dev_.logical, idx_mem_, nullptr);
             vkDestroyBuffer(dev_.logical, vert_buffer_, nullptr);
             vkFreeMemory(dev_.logical, vert_mem_, nullptr);
+
             vkDestroyCommandPool(dev_.logical, command_pool_, nullptr);
             vkDestroyDevice(dev_.logical, nullptr);
 #ifndef NDEBUG
@@ -67,6 +71,7 @@ class VulkanRenderer {
             create_framebuffers();
             create_command_pool();
             create_vert_buffer();
+            create_idx_buffer();
             create_command_buffers();
             create_semaphores();
         }
@@ -589,6 +594,30 @@ class VulkanRenderer {
             vkDestroyBuffer(dev_.logical, staging_buf, nullptr);
         }
 
+        void create_idx_buffer() {
+            auto buf_desc = BufferDesc{};
+            buf_desc.size = indices.size() * sizeof(indices[0]);
+            buf_desc.buf_usage_flags = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+            buf_desc.mem_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+            auto staging_buf = VkBuffer{};
+            auto staging_mem = VkDeviceMemory{};
+            create_buffer(dev_, buf_desc, &staging_buf, &staging_mem);
+
+            void* data = nullptr;
+            vkMapMemory(dev_.logical, staging_mem, 0, buf_desc.size, 0, &data);
+            std::memcpy(data, indices.data(), static_cast<size_t>(buf_desc.size));
+            vkUnmapMemory(dev_.logical, staging_mem);
+
+            buf_desc.buf_usage_flags = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+            buf_desc.mem_prop_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+            create_buffer(dev_, buf_desc, &idx_buffer_, &idx_mem_);
+            copy_buffer(dev_, queues_.graphics.queue, command_pool_, staging_buf, idx_buffer_, buf_desc.size);
+
+            vkFreeMemory(dev_.logical, staging_mem, nullptr);
+            vkDestroyBuffer(dev_.logical, staging_buf, nullptr);
+        }
+
         void create_command_buffers() {
             command_buffers_.resize(sc_framebuffers_.size());
             auto buffer_info = VkCommandBufferAllocateInfo{};
@@ -632,7 +661,9 @@ class VulkanRenderer {
                 VkBuffer buffers[] = {vert_buffer_};
                 VkDeviceSize offsets[] = {0};
                 vkCmdBindVertexBuffers(command_buffers_[i], 0, 1, buffers, offsets);
-                vkCmdDraw(command_buffers_[i], static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+                vkCmdBindIndexBuffer(command_buffers_[i], idx_buffer_, 0, VK_INDEX_TYPE_UINT16);
+                vkCmdDrawIndexed(command_buffers_[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
                 vkCmdEndRenderPass(command_buffers_[i]);
                 {
                     auto res = vkEndCommandBuffer(command_buffers_[i]);
@@ -815,8 +846,12 @@ class VulkanRenderer {
         VkPipeline pipeline_;
         VkCommandPool command_pool_;
         std::vector<VkCommandBuffer> command_buffers_;
+
         VkBuffer vert_buffer_;
         VkDeviceMemory vert_mem_;
+        VkBuffer idx_buffer_;
+        VkDeviceMemory idx_mem_;
+
         std::vector<VkSemaphore> image_available_;
         std::vector<VkSemaphore> render_finished_;
         std::vector<VkFence> frame_done_;
