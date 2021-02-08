@@ -76,6 +76,7 @@ class VulkanRenderer {
             create_vert_buffer();
             create_idx_buffer();
             create_uniform_buffers();
+            create_desc_pool();
             create_command_buffers();
             create_semaphores();
         }
@@ -402,6 +403,7 @@ class VulkanRenderer {
                 vkDestroyBuffer(dev_.logical, uniform_buffers_[i], nullptr);
                 vkFreeMemory(dev_.logical, uniform_mems_[i], nullptr);
             }
+            vkDestroyDescriptorPool(dev_.logical, desc_pool_, nullptr);
         }
 
         void recreate_swapchain() {
@@ -414,6 +416,7 @@ class VulkanRenderer {
             create_gfx_pipeline();
             create_framebuffers();
             create_uniform_buffers();
+            create_desc_pool();
             create_command_buffers();
 
             window_resized_ = false;
@@ -655,6 +658,25 @@ class VulkanRenderer {
 
             for (size_t i=0; i<command_buffers_.size(); ++i) {
                 create_buffer(dev_, buf_desc, &uniform_buffers_[i], &uniform_mems_[i]);
+            }
+        }
+
+        void create_desc_pool() {
+            auto pool_size = VkDescriptorPoolSize{};
+            pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            pool_size.descriptorCount = static_cast<uint32_t>(sc_imgs_.size());
+
+            auto desc_pool_info = VkDescriptorPoolCreateInfo{};
+            desc_pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+            desc_pool_info.poolSizeCount = 1;
+            desc_pool_info.pPoolSizes = &pool_size;
+            desc_pool_info.maxSets = static_cast<uint32_t>(sc_imgs_.size());
+
+            {
+                auto res = vkCreateDescriptorPool(dev_.logical, &desc_pool_info, nullptr, &desc_pool_);
+                if (res != VK_SUCCESS) {
+                    throw VulkanError("Error creating DescriptorPool", res);
+                }
             }
         }
 
@@ -906,6 +928,7 @@ class VulkanRenderer {
         VkPipelineLayout pl_layout_;
         VkPipeline pipeline_;
         VkCommandPool command_pool_;
+        VkDescriptorPool desc_pool_;
         std::vector<VkCommandBuffer> command_buffers_;
 
         VkBuffer vert_buffer_;
