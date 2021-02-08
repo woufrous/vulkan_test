@@ -13,6 +13,7 @@
 #include <GLFW/glfw3.h>
 
 #include "buffer.h"
+#include "descr.h"
 #include "device.h"
 #include "shader.h"
 #include "utils.h"
@@ -37,6 +38,7 @@ class VulkanRenderer {
                 vkDestroyFence(dev_.logical, frame_done_[i], nullptr);
             }
             cleanup_swapchain();
+            vkDestroyDescriptorSetLayout(dev_.logical, desc_set_layout_, nullptr);
 
             vkDestroyBuffer(dev_.logical, idx_buffer_, nullptr);
             vkFreeMemory(dev_.logical, idx_mem_, nullptr);
@@ -67,11 +69,13 @@ class VulkanRenderer {
             create_logical_device();
             create_swapchain();
             create_render_pass();
+            create_descriptor_set_layout();
             create_gfx_pipeline();
             create_framebuffers();
             create_command_pool();
             create_vert_buffer();
             create_idx_buffer();
+            create_uniform_buffers();
             create_command_buffers();
             create_semaphores();
         }
@@ -97,6 +101,8 @@ class VulkanRenderer {
                 vkWaitForFences(dev_.logical, 1, &frame_in_flight_[img_idx], VK_TRUE, UINT64_MAX);
             }
             frame_in_flight_[img_idx] = frame_done_[curr_frame_];
+
+            update_uniform_buffers(img_idx);
 
             auto submit_info = VkSubmitInfo{};
             submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -138,6 +144,18 @@ class VulkanRenderer {
                 }
             }
             curr_frame_ = (curr_frame_+1) % MAX_FRAMES_IN_FLIGHT;
+        }
+
+        void update_uniform_buffers(uint32_t img_idx) {
+            auto ubo = UniformBufferObject{};
+            ubo.model = glm::mat4(1.0f);
+            ubo.proj = glm::mat4(1.0f);
+            ubo.view = glm::mat4(1.0f);
+
+            void* data = nullptr;
+            vkMapMemory(dev_.logical, uniform_mems_[img_idx], 0, sizeof(ubo), 0, &data);
+            std::memcpy(data, reinterpret_cast<void*>(&ubo), sizeof(ubo));
+            vkUnmapMemory(dev_.logical, uniform_mems_[img_idx]);
         }
 
         static void win_resize_handler(GLFWwindow* win, int width, int height) {
@@ -379,6 +397,11 @@ class VulkanRenderer {
                 vkDestroyImageView(dev_.logical, img_view, nullptr);
             }
             vkDestroySwapchainKHR(dev_.logical, swap_chain_, nullptr);
+
+            for (size_t i=0; i<uniform_mems_.size(); ++i) {
+                vkDestroyBuffer(dev_.logical, uniform_buffers_[i], nullptr);
+                vkFreeMemory(dev_.logical, uniform_mems_[i], nullptr);
+            }
         }
 
         void recreate_swapchain() {
@@ -390,6 +413,7 @@ class VulkanRenderer {
             create_render_pass();
             create_gfx_pipeline();
             create_framebuffers();
+            create_uniform_buffers();
             create_command_buffers();
 
             window_resized_ = false;
@@ -491,6 +515,8 @@ class VulkanRenderer {
 
             auto pl_layout_info = VkPipelineLayoutCreateInfo{};
             pl_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+            pl_layout_info.setLayoutCount = 1;
+            pl_layout_info.pSetLayouts = &desc_set_layout_;
 
             {
                 auto res = vkCreatePipelineLayout(dev_.logical, &pl_layout_info, nullptr, &pl_layout_);
@@ -616,6 +642,20 @@ class VulkanRenderer {
 
             vkFreeMemory(dev_.logical, staging_mem, nullptr);
             vkDestroyBuffer(dev_.logical, staging_buf, nullptr);
+        }
+
+        void create_uniform_buffers() {
+            auto buf_desc = BufferDesc{};
+            buf_desc.size = sizeof(UniformBufferObject);
+            buf_desc.buf_usage_flags = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+            buf_desc.mem_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+            uniform_buffers_.resize(command_buffers_.size());
+            uniform_mems_.resize(command_buffers_.size());
+
+            for (size_t i=0; i<command_buffers_.size(); ++i) {
+                create_buffer(dev_, buf_desc, &uniform_buffers_[i], &uniform_mems_[i]);
+            }
         }
 
         void create_command_buffers() {
@@ -755,6 +795,26 @@ class VulkanRenderer {
             }
         }
 
+        void create_descriptor_set_layout() {
+            auto dsl_binding = VkDescriptorSetLayoutBinding{};
+            dsl_binding.binding = 0;
+            dsl_binding.descriptorCount = 1;
+            dsl_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            dsl_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+            auto dsl_info = VkDescriptorSetLayoutCreateInfo{};
+            dsl_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+            dsl_info.bindingCount = 1;
+            dsl_info.pBindings = &dsl_binding;
+
+            {
+                auto res = vkCreateDescriptorSetLayout(dev_.logical, &dsl_info, nullptr, &desc_set_layout_);
+                if (res != VK_SUCCESS) {
+                    throw VulkanError("Error creating DescriptorSetLayout", res);
+                }
+            }
+        }
+
         VkExtent2D get_image_extent(const VkSurfaceCapabilitiesKHR& sfc_caps) const {
             if (sfc_caps.currentExtent.width != UINT32_MAX) {
                 return sfc_caps.currentExtent;
@@ -842,6 +902,7 @@ class VulkanRenderer {
         std::vector<VkImageView> sc_img_views_;
         std::vector<VkFramebuffer> sc_framebuffers_;
         VkRenderPass render_pass_;
+        VkDescriptorSetLayout desc_set_layout_;
         VkPipelineLayout pl_layout_;
         VkPipeline pipeline_;
         VkCommandPool command_pool_;
@@ -851,6 +912,8 @@ class VulkanRenderer {
         VkDeviceMemory vert_mem_;
         VkBuffer idx_buffer_;
         VkDeviceMemory idx_mem_;
+        std::vector<VkBuffer> uniform_buffers_;
+        std::vector<VkDeviceMemory> uniform_mems_;
 
         std::vector<VkSemaphore> image_available_;
         std::vector<VkSemaphore> render_finished_;
