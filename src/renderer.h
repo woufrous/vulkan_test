@@ -77,6 +77,7 @@ class VulkanRenderer {
             create_idx_buffer();
             create_uniform_buffers();
             create_desc_pool();
+            create_desc_sets();
             create_command_buffers();
             create_semaphores();
         }
@@ -417,6 +418,7 @@ class VulkanRenderer {
             create_framebuffers();
             create_uniform_buffers();
             create_desc_pool();
+            create_desc_sets();
             create_command_buffers();
 
             window_resized_ = false;
@@ -653,10 +655,10 @@ class VulkanRenderer {
             buf_desc.buf_usage_flags = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
             buf_desc.mem_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
-            uniform_buffers_.resize(command_buffers_.size());
-            uniform_mems_.resize(command_buffers_.size());
+            uniform_buffers_.resize(sc_imgs_.size());
+            uniform_mems_.resize(sc_imgs_.size());
 
-            for (size_t i=0; i<command_buffers_.size(); ++i) {
+            for (size_t i=0; i<sc_imgs_.size(); ++i) {
                 create_buffer(dev_, buf_desc, &uniform_buffers_[i], &uniform_mems_[i]);
             }
         }
@@ -677,6 +679,41 @@ class VulkanRenderer {
                 if (res != VK_SUCCESS) {
                     throw VulkanError("Error creating DescriptorPool", res);
                 }
+            }
+        }
+
+        void create_desc_sets() {
+            auto layouts = std::vector<VkDescriptorSetLayout>(sc_imgs_.size(), desc_set_layout_);
+            desc_sets_.resize(sc_imgs_.size());
+
+            auto desc_set_info = VkDescriptorSetAllocateInfo{};
+            desc_set_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+            desc_set_info.descriptorPool = desc_pool_;
+            desc_set_info.descriptorSetCount = static_cast<uint32_t>(sc_imgs_.size());
+            desc_set_info.pSetLayouts = layouts.data();
+            {
+                auto res = vkAllocateDescriptorSets(dev_.logical, &desc_set_info, desc_sets_.data());
+                if (res != VK_SUCCESS) {
+                    throw VulkanError("Error creating DescriptorSets", res);
+                }
+            }
+
+            for (size_t i=0; i<sc_imgs_.size(); ++i) {
+                auto buf_info = VkDescriptorBufferInfo{};
+                buf_info.buffer = uniform_buffers_[i];
+                buf_info.offset = 0;
+                buf_info.range = sizeof(UniformBufferObject);
+
+                auto desc_write = VkWriteDescriptorSet{};
+                desc_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                desc_write.dstSet = desc_sets_[i];
+                desc_write.dstBinding = 0;
+                desc_write.dstArrayElement = 0;
+                desc_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                desc_write.descriptorCount = 1;
+                desc_write.pBufferInfo = &buf_info;
+
+                vkUpdateDescriptorSets(dev_.logical, 1, &desc_write, 0, nullptr);
             }
         }
 
@@ -724,6 +761,7 @@ class VulkanRenderer {
                 VkDeviceSize offsets[] = {0};
                 vkCmdBindVertexBuffers(command_buffers_[i], 0, 1, buffers, offsets);
                 vkCmdBindIndexBuffer(command_buffers_[i], idx_buffer_, 0, VK_INDEX_TYPE_UINT16);
+                vkCmdBindDescriptorSets(command_buffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pl_layout_, 0, 1, &desc_sets_[i], 0, nullptr);
                 vkCmdDrawIndexed(command_buffers_[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
                 vkCmdEndRenderPass(command_buffers_[i]);
@@ -930,6 +968,7 @@ class VulkanRenderer {
         VkCommandPool command_pool_;
         VkDescriptorPool desc_pool_;
         std::vector<VkCommandBuffer> command_buffers_;
+        std::vector<VkDescriptorSet> desc_sets_;
 
         VkBuffer vert_buffer_;
         VkDeviceMemory vert_mem_;
