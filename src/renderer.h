@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <exception>
@@ -11,6 +12,11 @@
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "buffer.h"
 #include "descr.h"
@@ -149,10 +155,25 @@ class VulkanRenderer {
         }
 
         void update_uniform_buffers(uint32_t img_idx) {
+            static auto t0 = std::chrono::high_resolution_clock::now();
+            auto dt = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - t0);
+
             auto ubo = UniformBufferObject{};
-            ubo.model = glm::mat4(1.0f);
-            ubo.proj = glm::mat4(1.0f);
-            ubo.view = glm::mat4(1.0f);
+            ubo.model = glm::rotate(
+                glm::mat4(1.0f),
+                dt.count() * glm::radians(90.0f),
+                glm::vec3(0.0f, 0.0f, 1.0f)
+            );
+            ubo.view = glm::lookAt(
+                glm::vec3(2.0f, 2.0f, 2.0f),
+                glm::vec3(0.0f, 0.0f, 0.0f),
+                glm::vec3(0.0f, 0.0f, 1.0f)
+            );
+            ubo.proj = glm::perspective(
+                glm::radians(45.0f),
+                swapchain_settings_.extent.width/(float)swapchain_settings_.extent.height,
+                0.1f, 10.0f
+            );
 
             void* data = nullptr;
             vkMapMemory(dev_.logical, uniform_mems_[img_idx], 0, sizeof(ubo), 0, &data);
