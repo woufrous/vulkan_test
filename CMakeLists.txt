@@ -4,18 +4,21 @@ project(vulkan_course VERSION 0.1.0)
 include(CTest)
 enable_testing()
 
-find_package(glfw3 3.3 REQUIRED)
+#find_package(glfw3 3.3 REQUIRED)
 find_package(Vulkan REQUIRED)
+
+include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+conan_basic_setup()
 
 add_custom_command(
     OUTPUT vert.spv
-    COMMAND glslc -o ${CMAKE_CURRENT_BINARY_DIR}/vert.spv -fshader-stage=vertex ${CMAKE_CURRENT_SOURCE_DIR}/src/shader/test.vert.glsl
+    COMMAND glslc -o $<TARGET_FILE_DIR:vulkan_course>/vert.spv -fshader-stage=vertex ${CMAKE_CURRENT_SOURCE_DIR}/src/shader/test.vert.glsl
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/shader/test.vert.glsl
 )
 
 add_custom_command(
     OUTPUT frag.spv
-    COMMAND glslc -o ${CMAKE_CURRENT_BINARY_DIR}/frag.spv -fshader-stage=fragment ${CMAKE_CURRENT_SOURCE_DIR}/src/shader/test.frag.glsl
+    COMMAND glslc -o $<TARGET_FILE_DIR:vulkan_course>/frag.spv -fshader-stage=fragment ${CMAKE_CURRENT_SOURCE_DIR}/src/shader/test.frag.glsl
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/shader/test.frag.glsl
 )
 
@@ -26,8 +29,8 @@ add_executable(vulkan_course
 )
 target_link_libraries(vulkan_course
     PUBLIC
-        glfw
         Vulkan::Vulkan
+        ${CONAN_LIBS}
 )
 target_compile_features(vulkan_course
     PUBLIC
