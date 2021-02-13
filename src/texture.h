@@ -175,3 +175,34 @@ inline VkImageView create_image_view(VkDevice dev, VkImage img, VkFormat fmt) {
 
     return ret;
 }
+
+inline VkSampler create_texture_sampler(VulkanDevice dev) {
+    auto ret = VkSampler{};
+
+    auto dev_props = VkPhysicalDeviceProperties{};
+    vkGetPhysicalDeviceProperties(dev.physical, &dev_props);
+
+    auto sampler_info = VkSamplerCreateInfo{};
+    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    sampler_info.minFilter = VkFilter::VK_FILTER_LINEAR;
+    sampler_info.magFilter = VkFilter::VK_FILTER_LINEAR;
+    sampler_info.addressModeU = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeV = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeW = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.anisotropyEnable = VK_TRUE;
+    sampler_info.maxAnisotropy = dev_props.limits.maxSamplerAnisotropy;
+    sampler_info.borderColor = VkBorderColor::VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    sampler_info.unnormalizedCoordinates = VK_FALSE;
+    sampler_info.compareEnable = VK_TRUE;
+    sampler_info.compareOp = VkCompareOp::VK_COMPARE_OP_ALWAYS;
+    sampler_info.mipmapMode = VkSamplerMipmapMode::VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    sampler_info.mipLodBias = 0.0f;
+    sampler_info.minLod = 0.0f;
+    sampler_info.maxLod = 0.0f;
+
+    if (auto res = vkCreateSampler(dev.logical, &sampler_info, nullptr, &ret); res != VK_SUCCESS) {
+        throw VulkanError("Error creating Sampler", res);
+    }
+
+    return ret;
+}

@@ -55,6 +55,8 @@ class VulkanRenderer {
             vkDestroyImage(dev_.logical, tex_image_, nullptr);
             vkFreeMemory(dev_.logical, tex_mem_, nullptr);
 
+            vkDestroySampler(dev_.logical, tex_sampler_, nullptr);
+
             vkDestroyCommandPool(dev_.logical, command_pool_, nullptr);
             vkDestroyDevice(dev_.logical, nullptr);
 #ifndef NDEBUG
@@ -84,6 +86,7 @@ class VulkanRenderer {
             create_framebuffers();
             create_command_pool();
             create_tex_image();
+            tex_sampler_ = create_texture_sampler(dev_);
             create_vert_buffer();
             create_idx_buffer();
             create_uniform_buffers();
@@ -254,11 +257,13 @@ class VulkanRenderer {
                 // has present queue
                 uint32_t queue_cnt;
                 vkGetPhysicalDeviceQueueFamilyProperties(dev, &queue_cnt, nullptr);
+                auto dev_features = VkPhysicalDeviceFeatures{};
+                vkGetPhysicalDeviceFeatures(dev, &dev_features);
 
                 VkBool32 supported;
                 for (uint32_t idx=0; idx<queue_cnt; ++idx) {
                     vkGetPhysicalDeviceSurfaceSupportKHR(dev, idx, surf_, &supported);
-                    if (supported) {
+                    if (supported && (dev_features.samplerAnisotropy == VK_TRUE)) {
                         dev_.physical = dev;
                         return;
                     }
@@ -313,10 +318,14 @@ class VulkanRenderer {
                 queue_create_infos.push_back(queue_info);
             };
 
+            auto dev_features = VkPhysicalDeviceFeatures{};
+            dev_features.samplerAnisotropy = VK_TRUE;
+
             VkDeviceCreateInfo ldev_info{};
             ldev_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
             ldev_info.queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size());
             ldev_info.pQueueCreateInfos = queue_create_infos.data();
+            ldev_info.pEnabledFeatures = &dev_features;
 
             auto dev_exts = get_device_extensions();
             ldev_info.enabledExtensionCount = dev_exts.size();
@@ -1023,6 +1032,8 @@ class VulkanRenderer {
         VkImage tex_image_;
         VkImageView tex_image_view_;
         VkDeviceMemory tex_mem_;
+
+        VkSampler tex_sampler_;
 
         std::vector<VkSemaphore> image_available_;
         std::vector<VkSemaphore> render_finished_;
