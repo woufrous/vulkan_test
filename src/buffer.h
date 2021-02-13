@@ -6,6 +6,7 @@
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
+#include "command.h"
 #include "device.h"
 #include "utils.h"
 
@@ -93,34 +94,11 @@ inline void create_buffer(const VulkanDevice dev, const BufferDesc& desc, VkBuff
 }
 
 inline void copy_buffer(const VulkanDevice dev, VkQueue tx_queue, VkCommandPool cmd_pool, VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size) {
-    auto cmd_buf_info = VkCommandBufferAllocateInfo{};
-    cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    cmd_buf_info.commandPool = cmd_pool;
-    cmd_buf_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    cmd_buf_info.commandBufferCount = 1;
-
-    auto mem_tx_buf = VkCommandBuffer{};
-    vkAllocateCommandBuffers(dev.logical, &cmd_buf_info, &mem_tx_buf);
-
-    auto begin_info = VkCommandBufferBeginInfo{};
-    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vkBeginCommandBuffer(mem_tx_buf, &begin_info);
+    auto mem_tx_buf = OneTimeCommandBuffer(dev.logical, cmd_pool, tx_queue);
 
     auto region = VkBufferCopy{};
     region.srcOffset = 0;
     region.dstOffset = 0;
     region.size = size;
     vkCmdCopyBuffer(mem_tx_buf, src_buf, dst_buf, 1, &region);
-
-    vkEndCommandBuffer(mem_tx_buf);
-
-    auto submit_info = VkSubmitInfo{};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &mem_tx_buf;
-    vkQueueSubmit(tx_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vkQueueWaitIdle(tx_queue);
-
-    vkFreeCommandBuffers(dev.logical, cmd_pool, 1, &mem_tx_buf);
 }
