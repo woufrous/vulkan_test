@@ -102,3 +102,17 @@ inline void copy_buffer(const VulkanDevice dev, VkQueue tx_queue, VkCommandPool 
     region.size = size;
     vkCmdCopyBuffer(mem_tx_buf, src_buf, dst_buf, 1, &region);
 }
+
+inline void copy_buffer_to_image(VkCommandBuffer cmd_buf, VkBuffer src_buf, VkImage dst_img, VkExtent3D extent) {
+    auto copy_region = VkBufferImageCopy{};
+    copy_region.bufferOffset = 0;
+    copy_region.bufferRowLength = 0;
+    copy_region.bufferImageHeight = 0;
+    copy_region.imageOffset = VkOffset3D{};
+    copy_region.imageExtent = extent;
+    copy_region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copy_region.imageSubresource.layerCount = 1;
+    copy_region.imageSubresource.baseArrayLayer = 0;
+    copy_region.imageSubresource.mipLevel = 0;
+    vkCmdCopyBufferToImage(cmd_buf, src_buf, dst_img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
+}

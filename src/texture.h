@@ -9,6 +9,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include "command.h"
 #include "utils.h"
 
 class Texture {
@@ -41,6 +42,14 @@ class Texture {
 
         uint32_t height() const noexcept {
             return static_cast<uint32_t>(height_);
+        }
+
+        VkExtent3D extent() const noexcept {
+            auto ret = VkExtent3D{};
+            ret.width = width();
+            ret.height = height();
+            ret.depth = 1;
+            return ret;
         }
     private:
         std::unique_ptr<uint8_t, decltype(&stbi_image_free)> ptr_;
@@ -104,4 +113,43 @@ inline void create_image(VulkanDevice dev, const ImageDesc& desc, VkImage* img, 
         }
     }
     vkBindImageMemory(dev.logical, *img, *mem, 0);
+}
+
+inline void transition_image_layout(
+    VkCommandBuffer cmd_buf, VkImage img,
+    VkImageLayout old_layout, VkImageLayout new_layout
+) {
+    auto img_barrier = VkImageMemoryBarrier{};
+    img_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    img_barrier.oldLayout = old_layout;
+    img_barrier.newLayout = new_layout;
+    img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    img_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    img_barrier.image = img;
+    img_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    img_barrier.subresourceRange.layerCount = 1;
+    img_barrier.subresourceRange.baseArrayLayer = 0;
+    img_barrier.subresourceRange.levelCount = 1;
+    img_barrier.subresourceRange.baseMipLevel = 0;
+
+    VkPipelineStageFlags src_stage, dst_stage;
+    if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+        src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        img_barrier.srcAccessMask = 0;
+
+        dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        img_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    } else {
+        src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        img_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        img_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    }
+
+    vkCmdPipelineBarrier(cmd_buf, src_stage, dst_stage, 0,
+        0, nullptr,     // memory barriers
+        0, nullptr,     // buffer memory barriers
+        1, &img_barrier // image memory barriers
+    );
 }

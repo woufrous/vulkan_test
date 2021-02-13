@@ -650,8 +650,17 @@ class VulkanRenderer {
             img_desc.mem_props = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
             create_image(dev_, img_desc, &tex_image_, &tex_mem_);
 
+            {
+                auto cmd_buf = OneTimeCommandBuffer(dev_.logical, command_pool_, queues_.graphics.queue);
+                transition_image_layout(cmd_buf, tex_image_, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                copy_buffer_to_image(cmd_buf, staging_buf, tex_image_, tex.extent());
+                transition_image_layout(cmd_buf, tex_image_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
+
             vkFreeMemory(dev_.logical, staging_mem, nullptr);
             vkDestroyBuffer(dev_.logical, staging_buf, nullptr);
+
+            tex_image_view_ = create_image_view(dev_.logical, tex_image_, VK_FORMAT_R8G8B8A8_SRGB);
         }
 
         void create_vert_buffer() {
