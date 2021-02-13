@@ -22,10 +22,17 @@ add_custom_command(
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/shader/test.frag.glsl
 )
 
+add_custom_command(
+    OUTPUT texture.jpg
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/res/texture.jpg $<TARGET_FILE_DIR:vulkan_course>/texture.jpg
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/res/texture.jpg
+)
+
 add_executable(vulkan_course
     src/main.cpp
     vert.spv
     frag.spv
+    texture.jpg
 )
 target_link_libraries(vulkan_course
     PUBLIC

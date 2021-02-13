@@ -22,6 +22,7 @@
 #include "descr.h"
 #include "device.h"
 #include "shader.h"
+#include "texture.h"
 #include "utils.h"
 #include "validation.h"
 
@@ -50,6 +51,8 @@ class VulkanRenderer {
             vkFreeMemory(dev_.logical, idx_mem_, nullptr);
             vkDestroyBuffer(dev_.logical, vert_buffer_, nullptr);
             vkFreeMemory(dev_.logical, vert_mem_, nullptr);
+            vkDestroyImage(dev_.logical, tex_image_, nullptr);
+            vkFreeMemory(dev_.logical, tex_mem_, nullptr);
 
             vkDestroyCommandPool(dev_.logical, command_pool_, nullptr);
             vkDestroyDevice(dev_.logical, nullptr);
@@ -79,6 +82,7 @@ class VulkanRenderer {
             create_gfx_pipeline();
             create_framebuffers();
             create_command_pool();
+            create_tex_image();
             create_vert_buffer();
             create_idx_buffer();
             create_uniform_buffers();
@@ -622,6 +626,34 @@ class VulkanRenderer {
             }
         }
 
+        void create_tex_image() {
+            auto tex = Texture("texture.jpg");
+
+            auto buf_desc = BufferDesc{};
+            buf_desc.size = tex.size();
+            buf_desc.buf_usage_flags = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+            buf_desc.mem_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+            auto staging_buf = VkBuffer{};
+            auto staging_mem = VkDeviceMemory{};
+            create_buffer(dev_, buf_desc, &staging_buf, &staging_mem);
+
+            void* data = nullptr;
+            vkMapMemory(dev_.logical, staging_mem, 0, buf_desc.size, 0, &data);
+            std::memcpy(data, tex.data(), static_cast<size_t>(buf_desc.size));
+            vkUnmapMemory(dev_.logical, staging_mem);
+
+            auto img_desc = ImageDesc{};
+            img_desc.width = tex.width();
+            img_desc.height = tex.height();
+            img_desc.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            img_desc.mem_props = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+            create_image(dev_, img_desc, &tex_image_, &tex_mem_);
+
+            vkFreeMemory(dev_.logical, staging_mem, nullptr);
+            vkDestroyBuffer(dev_.logical, staging_buf, nullptr);
+        }
+
         void create_vert_buffer() {
             auto buf_desc = BufferDesc{};
             buf_desc.size = vertices.size() * sizeof(vertices[0]);
@@ -997,6 +1029,8 @@ class VulkanRenderer {
         VkDeviceMemory idx_mem_;
         std::vector<VkBuffer> uniform_buffers_;
         std::vector<VkDeviceMemory> uniform_mems_;
+        VkImage tex_image_;
+        VkDeviceMemory tex_mem_;
 
         std::vector<VkSemaphore> image_available_;
         std::vector<VkSemaphore> render_finished_;
