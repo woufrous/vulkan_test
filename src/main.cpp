@@ -60,8 +60,8 @@ int main(int argc, char* argv[]) {
         glfwTerminate();
         return 1;
     }
-    catch (...) {
-        std::cerr << "Unhandled exception!" << std::endl;
+    catch (const std::exception& ex) {
+        std::cerr << "Unhandled exception: " << ex.what() << std::endl;
 
         glfwDestroyWindow(win);
         glfwTerminate();
