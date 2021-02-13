@@ -55,20 +55,6 @@ struct BufferDesc {
     VkMemoryPropertyFlags mem_prop_flags;
 };
 
-static inline uint32_t find_memory_type(VkPhysicalDevice dev, uint32_t type_filter, const VkMemoryPropertyFlags& props) {
-    auto mem_props = VkPhysicalDeviceMemoryProperties{};
-    vkGetPhysicalDeviceMemoryProperties(dev, &mem_props);
-    for (uint32_t i=0; i<mem_props.memoryTypeCount; ++i) {
-        if (
-            (type_filter & (1<<i)) &&
-            ((mem_props.memoryTypes[i].propertyFlags & props) == props)
-        ) {
-            return i;
-        }
-    }
-    return 0;
-}
-
 inline void create_buffer(const VulkanDevice dev, const BufferDesc& desc, VkBuffer* buf, VkDeviceMemory* mem) {
     auto buf_info = VkBufferCreateInfo{};
     buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;

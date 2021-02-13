@@ -35,6 +35,20 @@ std::optional<uint32_t> filter_queues(const C& cntnr, P predicate) {
     return std::nullopt;
 }
 
+inline uint32_t find_memory_type(VkPhysicalDevice dev, uint32_t type_filter, const VkMemoryPropertyFlags& props) {
+    auto mem_props = VkPhysicalDeviceMemoryProperties{};
+    vkGetPhysicalDeviceMemoryProperties(dev, &mem_props);
+    for (uint32_t i=0; i<mem_props.memoryTypeCount; ++i) {
+        if (
+            (type_filter & (1<<i)) &&
+            ((mem_props.memoryTypes[i].propertyFlags & props) == props)
+        ) {
+            return i;
+        }
+    }
+    return 0;
+}
+
 class VulkanError : public std::runtime_error {
     public:
         VulkanError(const char* what, VkResult ec) :
