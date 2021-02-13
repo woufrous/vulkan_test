@@ -51,6 +51,7 @@ class VulkanRenderer {
             vkFreeMemory(dev_.logical, idx_mem_, nullptr);
             vkDestroyBuffer(dev_.logical, vert_buffer_, nullptr);
             vkFreeMemory(dev_.logical, vert_mem_, nullptr);
+            vkDestroyImageView(dev_.logical, tex_image_view_, nullptr);
             vkDestroyImage(dev_.logical, tex_image_, nullptr);
             vkFreeMemory(dev_.logical, tex_mem_, nullptr);
 
@@ -387,28 +388,9 @@ class VulkanRenderer {
             vkGetSwapchainImagesKHR(dev_.logical, swap_chain_, &img_cnt, sc_imgs_.data());
 
             sc_img_views_.resize(img_cnt);
-            auto ivc_info = VkImageViewCreateInfo{};
-            ivc_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-            ivc_info.format = swapchain_settings_.format;
-            ivc_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-            ivc_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            ivc_info.subresourceRange.baseMipLevel = 0;
-            ivc_info.subresourceRange.levelCount = 1;
-            ivc_info.subresourceRange.baseArrayLayer = 0;
-            ivc_info.subresourceRange.layerCount = 1;
-            ivc_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-            ivc_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-            ivc_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-            ivc_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
             for (size_t i=0; i<img_cnt; ++i) {
-                ivc_info.image = sc_imgs_[i];
-                {
-                    auto res = vkCreateImageView(dev_.logical, &ivc_info, nullptr, &sc_img_views_[i]);
-                    if (res != VK_SUCCESS) {
-                        throw VulkanError("Error creating ImageView", res);
-                    }
-                }
+                sc_img_views_[i] = create_image_view(dev_.logical, sc_imgs_[i], swapchain_settings_.format);
             }
         }
 
@@ -1039,6 +1021,7 @@ class VulkanRenderer {
         std::vector<VkBuffer> uniform_buffers_;
         std::vector<VkDeviceMemory> uniform_mems_;
         VkImage tex_image_;
+        VkImageView tex_image_view_;
         VkDeviceMemory tex_mem_;
 
         std::vector<VkSemaphore> image_available_;

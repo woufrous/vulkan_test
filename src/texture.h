@@ -153,3 +153,25 @@ inline void transition_image_layout(
         1, &img_barrier // image memory barriers
     );
 }
+
+
+inline VkImageView create_image_view(VkDevice dev, VkImage img, VkFormat fmt) {
+    auto ret = VkImageView{};
+
+    auto iv_info = VkImageViewCreateInfo{};
+    iv_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    iv_info.image = img;
+    iv_info.format = fmt;
+    iv_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    iv_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    iv_info.subresourceRange.levelCount = 1;
+    iv_info.subresourceRange.baseMipLevel = 0;
+    iv_info.subresourceRange.layerCount = 1;
+    iv_info.subresourceRange.baseArrayLayer = 0;
+
+    if (auto res = vkCreateImageView(dev, &iv_info, nullptr, &ret); res != VK_SUCCESS) {
+        throw VulkanError("Error creating ImageView", res);
+    }
+
+    return ret;
+}
