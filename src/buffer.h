@@ -93,7 +93,7 @@ inline void create_buffer(const VulkanDevice dev, const BufferDesc& desc, VkBuff
     malloc_info.allocationSize = mem_reqs.size;
     malloc_info.memoryTypeIndex = find_memory_type(
         dev.physical, mem_reqs.memoryTypeBits,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        desc.mem_prop_flags
     );
 
     {
