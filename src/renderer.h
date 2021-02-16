@@ -642,7 +642,8 @@ class VulkanRenderer {
             create_image(dev_, img_desc, &tex_image_, &tex_mem_);
 
             {
-                auto cmd_buf = OneTimeCommandBuffer(dev_.logical, command_pool_, queues_.graphics.queue);
+                auto cmd_buf = OneTimeCommandBuffer(dev_.logical, command_pool_);
+                auto cmd_executor = RAIICommandBufferExecutor(cmd_buf, queues_.graphics.queue);
                 transition_image_layout(cmd_buf, tex_image_, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
                 copy_buffer_to_image(cmd_buf, staging_buf, tex_image_, tex.extent());
                 transition_image_layout(cmd_buf, tex_image_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

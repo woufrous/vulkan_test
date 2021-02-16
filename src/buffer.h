@@ -94,7 +94,8 @@ inline void create_buffer(const VulkanDevice dev, const BufferDesc& desc, VkBuff
 }
 
 inline void copy_buffer(const VulkanDevice dev, VkQueue tx_queue, VkCommandPool cmd_pool, VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size) {
-    auto mem_tx_buf = OneTimeCommandBuffer(dev.logical, cmd_pool, tx_queue);
+    auto mem_tx_buf = OneTimeCommandBuffer(dev.logical, cmd_pool);
+    auto cmd_executor = RAIICommandBufferExecutor(mem_tx_buf, tx_queue);
 
     auto region = VkBufferCopy{};
     region.srcOffset = 0;
