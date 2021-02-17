@@ -13,6 +13,7 @@
 struct Vertex {
     glm::vec2 pos;
     glm::vec3 color;
+    glm::vec2 uv;
 
     static
     VkVertexInputBindingDescription
@@ -26,9 +27,9 @@ struct Vertex {
     }
 
     static
-    std::array<VkVertexInputAttributeDescription, 2>
+    std::array<VkVertexInputAttributeDescription, 3>
     get_attrib_desc() {
-        std::array<VkVertexInputAttributeDescription, 2> ret;
+        std::array<VkVertexInputAttributeDescription, 3> ret;
         ret[0].binding = 0;
         ret[0].location = 0;
         ret[0].format = VkFormat::VK_FORMAT_R32G32_SFLOAT;
@@ -37,15 +38,19 @@ struct Vertex {
         ret[1].location = 1;
         ret[1].format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
         ret[1].offset = offsetof(Vertex, color);
+        ret[2].binding = 0;
+        ret[2].location = 2;
+        ret[2].format = VkFormat::VK_FORMAT_R32G32_SFLOAT;
+        ret[2].offset = offsetof(Vertex, uv);
         return ret;
     }
 };
 
 inline const std::vector<Vertex> vertices = {
-    Vertex{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-    Vertex{{0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-    Vertex{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-    Vertex{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+    Vertex{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+    Vertex{{0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+    Vertex{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+    Vertex{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
 };
 
 inline const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
