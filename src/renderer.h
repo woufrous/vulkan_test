@@ -718,14 +718,16 @@ class VulkanRenderer {
         }
 
         void create_desc_pool() {
-            auto pool_size = VkDescriptorPoolSize{};
-            pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            pool_size.descriptorCount = static_cast<uint32_t>(sc_imgs_.size());
+            auto pool_size = std::array<VkDescriptorPoolSize,2>{};
+            pool_size[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            pool_size[0].descriptorCount = static_cast<uint32_t>(sc_imgs_.size());
+            pool_size[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            pool_size[1].descriptorCount = static_cast<uint32_t>(sc_imgs_.size());
 
             auto desc_pool_info = VkDescriptorPoolCreateInfo{};
             desc_pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-            desc_pool_info.poolSizeCount = 1;
-            desc_pool_info.pPoolSizes = &pool_size;
+            desc_pool_info.poolSizeCount = static_cast<uint32_t>(pool_size.size());
+            desc_pool_info.pPoolSizes = pool_size.data();
             desc_pool_info.maxSets = static_cast<uint32_t>(sc_imgs_.size());
 
             {
@@ -758,16 +760,29 @@ class VulkanRenderer {
                 buf_info.offset = 0;
                 buf_info.range = sizeof(UniformBufferObject);
 
-                auto desc_write = VkWriteDescriptorSet{};
-                desc_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                desc_write.dstSet = desc_sets_[i];
-                desc_write.dstBinding = 0;
-                desc_write.dstArrayElement = 0;
-                desc_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                desc_write.descriptorCount = 1;
-                desc_write.pBufferInfo = &buf_info;
+                auto img_info = VkDescriptorImageInfo{};
+                img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                img_info.imageView = tex_image_view_;
+                img_info.sampler = tex_sampler_;
 
-                vkUpdateDescriptorSets(dev_.logical, 1, &desc_write, 0, nullptr);
+                auto desc_write = std::array<VkWriteDescriptorSet,2>{};
+                desc_write[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                desc_write[0].dstSet = desc_sets_[i];
+                desc_write[0].dstBinding = 0;
+                desc_write[0].dstArrayElement = 0;
+                desc_write[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                desc_write[0].descriptorCount = 1;
+                desc_write[0].pBufferInfo = &buf_info;
+
+                desc_write[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                desc_write[1].dstSet = desc_sets_[i];
+                desc_write[1].dstBinding = 1;
+                desc_write[1].dstArrayElement = 0;
+                desc_write[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                desc_write[1].descriptorCount = 1;
+                desc_write[1].pImageInfo = &img_info;
+
+                vkUpdateDescriptorSets(dev_.logical, static_cast<uint32_t>(desc_write.size()), desc_write.data(), 0, nullptr);
             }
         }
 
@@ -910,16 +925,25 @@ class VulkanRenderer {
         }
 
         void create_descriptor_set_layout() {
-            auto dsl_binding = VkDescriptorSetLayoutBinding{};
-            dsl_binding.binding = 0;
-            dsl_binding.descriptorCount = 1;
-            dsl_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            dsl_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+            auto vb_binding = VkDescriptorSetLayoutBinding{};
+            vb_binding.binding = 0;
+            vb_binding.descriptorCount = 1;
+            vb_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            vb_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+            auto sampler_binding = VkDescriptorSetLayoutBinding{};
+            sampler_binding.binding = 1;
+            sampler_binding.descriptorCount = 1;
+            sampler_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            sampler_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+            sampler_binding.pImmutableSamplers = nullptr;
+
+            auto bindings = std::array<VkDescriptorSetLayoutBinding,2>{vb_binding, sampler_binding};
 
             auto dsl_info = VkDescriptorSetLayoutCreateInfo{};
             dsl_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-            dsl_info.bindingCount = 1;
-            dsl_info.pBindings = &dsl_binding;
+            dsl_info.bindingCount = static_cast<uint32_t>(bindings.size());
+            dsl_info.pBindings = bindings.data();
 
             {
                 auto res = vkCreateDescriptorSetLayout(dev_.logical, &dsl_info, nullptr, &desc_set_layout_);
